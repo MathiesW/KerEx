@@ -1,5 +1,2 @@
-"""
-Here come more advanced layers like
-- FNO block
-- convolutional encoder and decoder
-"""
+from .autoencoder import Encoder1D, Encoder2D, Encoder3D
+from .autoencoder import Decoder1D, Decoder2D, Decoder3D
