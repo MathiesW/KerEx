@@ -1,0 +1,5 @@
+sphinx
+furo
+keras
+tensorflow
+packaging
