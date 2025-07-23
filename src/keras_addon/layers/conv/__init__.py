@@ -9,7 +9,7 @@ from packaging import version
 
 MIN_KERAS_VERSION = "3.10.0"
 
-if version.parse(keras.__version__) >= MIN_KERAS_VERSION:
+if version.parse(keras.__version__) >= version.parse(MIN_KERAS_VERSION):
     from keras.src.layers.convolutional.base_conv import BaseConv
     from keras.src.layers.convolutional.base_conv_transpose import BaseConvTranspose
     from keras.src.layers.convolutional.base_separable_conv import BaseSeparableConv
@@ -22,12 +22,15 @@ if version.parse(keras.__version__) >= MIN_KERAS_VERSION:
 
 else:
     """ 
-    Keras versions < 3.10.0 had faulty serialization of Convolutional layers,
+    Keras versions <3.10.0 had faulty serialization code for Convolutional layers,
+    which throw an error once the activation function was defined as a layer, e.g.,
+    `activation=layers.ReLU(negative_slope=0.1)`, 
     c.f. https://github.com/keras-team/keras/issues/21088.
 
-    The following implementation fixes that for Keras<=3.10.0
+    The following implementations fix that problem for Keras<3.10.0
 
     """
+    
     from .base_conv import MyBaseConv as BaseConv
     from .base_conv import MyBaseConvTranspose as BaseConvTranspose
     from .base_conv import MyBaseSeparableConv as BaseSeparableConv
