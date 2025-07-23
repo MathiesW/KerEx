@@ -7,7 +7,7 @@ class Unet1D(BaseUnet):
     def __init__(
         self,
         filters=[8, 16, 32],
-        kernel_size=[5, 5, 5],
+        kernel_size=5,
         data_format="channels_last",
         activation="relu",
         use_bias=True,
@@ -53,7 +53,7 @@ class Unet2D(BaseUnet):
     def __init__(
         self,
         filters=[8, 16, 32],
-        kernel_size=[5, 5, 5],
+        kernel_size=5,
         data_format="channels_last",
         activation="relu",
         use_bias=True,
@@ -99,7 +99,7 @@ class Unet3D(BaseUnet):
     def __init__(
         self,
         filters=[8, 16, 32],
-        kernel_size=[5, 5, 5],
+        kernel_size=5,
         data_format="channels_last",
         activation="relu",
         use_bias=True,
