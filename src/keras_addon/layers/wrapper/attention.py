@@ -3,7 +3,7 @@ from keras import saving
 from keras import ops
 from functools import partial
 from typing import Tuple
-from ..attention import GlobalSelfAttention
+from ...blocks.attention import GlobalSelfAttention
 
 
 @saving.register_keras_serializable(package="KerasAddon.Layers.Wrapper", name="SpatialAttention")
