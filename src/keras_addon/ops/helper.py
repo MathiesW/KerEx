@@ -229,3 +229,76 @@ def get_layer(identifier, module="keras.layers", registered_name=None, **layer_k
             f"Could not interpret layer identifier: {identifier}"
         )
     
+
+class _IterableVars:
+    """
+    This class just provides basic functionality for convolutional blocks
+
+    **Use for inheritance only!**
+
+    This class provides a function to set the class variables as iterables based on the the first keyword argument.
+
+    """
+
+    def set_vars(self, **kwargs):
+        """
+        Wrap all `**kwargs` to list and set as class attribute
+
+        The first keyword argument has a special role here, as it determines the depth of the network.
+        All other parameters (if given as a list or tuple initially) have to comply with the length of this keyword argument.
+
+        Parameters
+        ----------
+        **kwargs : Keyword arguments.
+
+        Raises
+        ------
+        ValueError
+            If an argument is a list/tuple and contains other dtypes than `int`, `float`, `str`, `bool` or `tuple`.
+        ValueError
+            If an argument is a list/tuple and contains tuples that do not match `self.rank`.
+            This error is only raised when a model has a class attribute `self.rank`.
+        ValueError
+            If an argument does not match the length of the reference key.
+        
+        """
+
+        if not kwargs:
+            return
+
+        # get the reference key, which has to be the first keyword
+        ref_key = list(kwargs.keys())[0]  # e.g., `filters`
+
+        # now iterate over kwargs
+        for k, arg in kwargs.items():
+            if isinstance(arg, (list, tuple)):
+                if len(arg) == 1:
+                    # unpack list/tuple of length 1
+                    arg, = arg
+
+            if isinstance(arg, (int, float, str, bool, tuple)) or (arg is None):
+                if hasattr(self, ref_key):
+                    # wrap singular argument (that is not `filters` in list)
+                    arg = [arg] * len(getattr(self, ref_key))
+                else:
+                    # wrap `ref_key` argument in list if it is not a tuple (iterable) already
+                    if not isinstance(arg, tuple):
+                        arg = [arg]
+
+            if not all(isinstance(f, (int, float, str, bool, tuple)) or (f is None) for f in arg):
+                raise ValueError(f"Received bad `{k}` argument. Expected all entries of `{k}` to be either `int`, `str`, `bool`, or `tuple`.")
+            
+            if hasattr(self, ref_key):
+                if hasattr(self, "rank"):
+                    if not all(len(f) == self.rank for f in arg if isinstance(f, tuple)):
+                        raise ValueError(f"Rank of provided `{ref_key}` does not match rank of the block or model, expected `{k}` of rank {self.rank}.")
+            
+            try:
+                if not len(arg) == len(getattr(self, ref_key)):
+                    raise ValueError(f"Too many arguments for `{k}`, expected {len(getattr(self, ref_key))}, received {len(arg)}.")
+            except AttributeError:
+                # `ref_key` was not set yet, no comparison possible
+                pass
+            
+            # set `v` as class attribute `k`
+            setattr(self, k, arg)
