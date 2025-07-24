@@ -11,8 +11,9 @@ class Encoder1D(BaseEncoder):
     ----------
     filters : int | list | tuple
         Number of filters for the convolutional forward sub-model.
-    kernel_size : int | list | tuple
+    kernel_size : int | list | tuple, optional
         Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
     strides : int | list | tuple, optional
         Strides for the convolutional forward sub-model.
         Defaults to 1.
@@ -75,7 +76,7 @@ class Encoder1D(BaseEncoder):
     def __init__(
             self, 
             filters, 
-            kernel_size, 
+            kernel_size=5, 
             strides=1, 
             padding="same",
             data_format="channels_last", 
@@ -141,8 +142,9 @@ class Encoder2D(BaseEncoder):
     ----------
     filters : int | list | tuple
         Number of filters for the convolutional forward sub-model.
-    kernel_size : int | list | tuple
+    kernel_size : int | list | tuple, optional
         Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
     strides : int | list | tuple, optional
         Strides for the convolutional forward sub-model.
         Defaults to 1.
@@ -202,7 +204,7 @@ class Encoder2D(BaseEncoder):
     def __init__(
             self, 
             filters, 
-            kernel_size, 
+            kernel_size=5, 
             strides=1, 
             data_format="channels_last", 
             dilation_rate=1, 
@@ -265,8 +267,9 @@ class Encoder3D(BaseEncoder):
     ----------
     filters : int | list | tuple
         Number of filters for the convolutional forward sub-model.
-    kernel_size : int | list | tuple
+    kernel_size : int | list | tuple, optional
         Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
     strides : int | list | tuple, optional
         Strides for the convolutional forward sub-model.
         Defaults to 1.
@@ -326,7 +329,7 @@ class Encoder3D(BaseEncoder):
     def __init__(
             self, 
             filters, 
-            kernel_size, 
+            kernel_size=5, 
             strides=1, 
             data_format="channels_last", 
             dilation_rate=1, 

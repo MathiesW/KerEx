@@ -23,8 +23,9 @@ class BaseDecoder(layers.Layer, _BaseConvBlock):
         Rank of `BaseEncoder`. Must be within {1, 2, 3}.
     filters : int | list | tuple
         Number of filters for the convolutional forward sub-model.
-    kernel_size : int | list | tuple
+    kernel_size : int | list | tuple, optional
         Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
     strides : int | list | tuple, optional
         Strides for the convolutional forward sub-model.
         Defaults to 1.
@@ -84,7 +85,7 @@ class BaseDecoder(layers.Layer, _BaseConvBlock):
             self,
             rank,
             filters,
-            kernel_size,
+            kernel_size=5,
             strides=1,
             padding="same",
             data_format="channels_last",

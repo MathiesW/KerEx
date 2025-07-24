@@ -20,8 +20,9 @@ class BaseEncoder(layers.Layer, _BaseConvBlock):
         Rank of `BaseEncoder`. Must be within {1, 2, 3}.
     filters : int | list | tuple
         Number of filters for the convolutional forward sub-model.
-    kernel_size : int | list | tuple
+    kernel_size : int | list | tuple, optional
         Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
     strides : int | list | tuple, optional
         Strides for the convolutional forward sub-model.
         Defaults to 1.
@@ -89,7 +90,7 @@ class BaseEncoder(layers.Layer, _BaseConvBlock):
             self,
             rank,
             filters,
-            kernel_size,
+            kernel_size=5,
             strides=1,
             padding="same",
             data_format="channels_last",
@@ -125,7 +126,7 @@ class BaseEncoder(layers.Layer, _BaseConvBlock):
         self.bias_constraint = bias_constraint
 
         # set class variables for the Sequential model
-        self.set_vars(filters=filters, kernel_size=kernel_size, strides=strides, dilation_rate=dilation_rate, groups=groups)        
+        self.set_vars(filters=filters, kernel_size=kernel_size, strides=strides, dilation_rate=dilation_rate, groups=groups)
 
         # set class variables that are relevant for downsampling operation
         self.downsampling_filters = downsampling_filters or self.filters[-1]
