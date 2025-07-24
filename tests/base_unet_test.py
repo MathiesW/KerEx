@@ -13,6 +13,12 @@ def test_padding_modes_1d(padding):
 
 
 @pytest.mark.parametrize("rank", [1, 2, 3])
+def test_filters_as_tuple(rank):
+    filters = [(8, 8), 16, 32]
+    BaseModel(rank=rank, filters=filters)
+    
+
+@pytest.mark.parametrize("rank", [1, 2, 3])
 def test_kernel_size_as_list(rank):
     kernel_size = [3]
     BaseModel(rank=rank, kernel_size=kernel_size)
