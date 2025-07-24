@@ -45,14 +45,17 @@ class _BaseConvBlock:
                     # wrap singular argument (that is not `filters` in list)
                     v = [v] * len(self.filters)
                 else:
-                    # wrap `filters` argument in list
-                    v = [v]
+                    # wrap `filters` argument in list if it is not a tuple (iterable) already
+                    if not isinstance(v, tuple):
+                        v = [v]
 
             if not all(isinstance(f, (int, str, tuple)) for f in v):
                 raise ValueError(f"Received bad `{k}` argument. Expected all entries of `{k}` to be either `int`, `str`, or `tuple`.")
             
-            if not all(len(f) == self.rank for f in v if isinstance(f, tuple)):
-                raise ValueError(f"Rank of provided filters does not match rank of the model, expected `{k}` of rank {self.rank}.")
+            if hasattr(self, "filters"):
+                if not all(len(f) == self.rank for f in v if isinstance(f, tuple)):  #  and (v in ["kernel_size", "strides", "dilation_rate"]):
+                    # this is valid for parameters `kernel_size`, `strides`, and `dilation_rate` only!
+                    raise ValueError(f"Rank of provided filters does not match rank of the model, expected `{k}` of rank {self.rank}.")
             
             try:
                 if not len(v) == len(self.filters):
