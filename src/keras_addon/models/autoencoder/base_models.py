@@ -1,12 +1,12 @@
-from keras import Model
+from keras import models
 from keras import regularizers, initializers, constraints
 from keras import saving
 from ...blocks.autoencoder.base_encoder import BaseEncoder
 from ...blocks.autoencoder.base_decoder import BaseDecoder
-from ...blocks.autoencoder.base_block import _BaseConvBlock
+from ...ops.helper import _IterableVars
 
 
-class BaseFCN(Model, _BaseConvBlock):
+class BaseFCN(models.Model, _IterableVars):
     """
     Base class of FullyConvolutionalNetwork (FCN)
 

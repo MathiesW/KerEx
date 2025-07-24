@@ -6,12 +6,12 @@ from keras import constraints
 from keras import saving
 from keras.src.layers.merging.base_merge import Merge
 
-from .base_block import _BaseConvBlock
+from ...ops.helper import _IterableVars
 from ...layers.conv import BaseConv, BaseConvTranspose
 from ...ops import get_layer
 
 
-class BaseDecoder(layers.Layer, _BaseConvBlock):
+class BaseDecoder(layers.Layer, _IterableVars):
     """
     Base class of convolutional decoder block
 

@@ -4,11 +4,11 @@ from keras import initializers
 from keras import regularizers
 from keras import constraints
 from keras import saving
-from .base_block import _BaseConvBlock
+from ...ops.helper import _IterableVars
 from ...layers.conv import BaseConv
 
 
-class BaseEncoder(layers.Layer, _BaseConvBlock):
+class BaseEncoder(layers.Layer, _IterableVars):
     """
     Base class of convolutional encoder block
 
