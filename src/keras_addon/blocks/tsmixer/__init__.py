@@ -1,1 +1,1 @@
-from .ts_mixer import TSMixerBlock
+from .tsmixer import TSMixerBlock
