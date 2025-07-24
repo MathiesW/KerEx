@@ -401,7 +401,7 @@ class BaseUnet(BaseFCN):
     Parameters
     ----------
     rank : int {1, 2, 3}
-        Rank of `BaseFCN`. Must be within {1, 2, 3}.
+        Rank of `BaseUnet`. Must be within {1, 2, 3}.
     filters : int | list | tuple
         Number of filters. 
         The model will be build symmetrically, meaning that only the number of encoder filters is defined,
