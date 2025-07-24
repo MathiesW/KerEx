@@ -79,6 +79,11 @@ class BaseDecoder(layers.Layer, _BaseConvBlock):
         Defaults to `None`.
     **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
 
+    Raises
+    ------
+    TypeError
+        If `merge_layer` is not valid Keras merge layer, cf. https://keras.io/api/layers/merging_layers/
+        
     """
 
     def __init__(
