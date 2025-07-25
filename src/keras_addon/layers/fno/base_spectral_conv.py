@@ -1,228 +1,519 @@
-from keras import Layer, KerasTensor
-from keras import regularizers, initializers
+from keras import Layer
+from keras import initializers
+from keras import regularizers
+from keras import constraints
 from keras import ops
+from keras.src.layers.input_spec import InputSpec
+from keras.src.backend.config import backend
+from keras.src.backend import standardize_data_format
+from keras.src.utils.argument_validation import standardize_tuple
 from typing import Tuple
-from ...ops.fft import rfft, rfft2, irfft, irfft2
+from importlib import import_module
 from functools import partial
 
 
-class BaseSpectralConv1D(Layer):
+class BaseSpectralConv(Layer):
     def __init__(
-        self, 
-        filters: int, 
-        modes: int, 
-        name: str = None, 
-        kernel_regularizer: regularizers.Regularizer = None, 
-        bias_regularizer: regularizers.Regularizer = None, 
-        activity_regularizer: regularizers.Regularizer = None, 
-        data_format: str = 'channels_last', 
-        use_bias: bool = True,
+        self,
+        rank,
+        filters,
+        modes,
+        data_format="channels_last",
+        use_bias=True,
+        kernel_initializer="he_normal",
+        bias_initializer="zeros",
+        kernel_constraint=None,
+        bias_constraint=None,
+        kernel_regularizer=None,
+        bias_regularizer=None,
+        name=None,
         **kwargs
     ):
-        # NVIDIA recommends 'using the NHWC format where possible': https://docs.nvidia.com/deeplearning/performance/dl-performance-convolutional/index.html#tensor-layout
-        super().__init__(
-            name=name, 
-            activity_regularizer=activity_regularizer, 
-            **kwargs
-        )
-        self.data_format = data_format.lower()
-        assert self.data_format in ['channels_first', 'channels_last']
-        if self.data_format == 'channels_first':
-            raise NotImplementedError(f"Data format 'channels_first' is currently not supported.\nNVIDIA recommends to use 'channels_last' anyway!")
-
+        super().__init__(name=name, **kwargs)
+        self.rank = rank
         self.filters = filters
-        self.modes = modes
-        self.data_axes = (-2,)  # for convolution with channels last
+        self.modes = standardize_tuple(modes, rank, name="modes")
+        self.use_bias = use_bias
+        self.kernel_initializer = initializers.get(kernel_initializer)
+        self.bias_initializer = initializers.get(bias_initializer)
         self.kernel_regularizer = regularizers.get(kernel_regularizer)
         self.bias_regularizer = regularizers.get(bias_regularizer)
-        self.use_bias = use_bias
+        self.kernel_constraint = constraints.get(kernel_constraint)
+        self.bias_constraint = constraints.get(bias_constraint)
+        self.data_format = standardize_data_format(data_format)
 
-        # callables
-        self.transpose_to_channels_first = partial(ops.transpose, axes=[0, 1, 2] if data_format =='channels_first' else [0, 2, 1])
-        self.inverse_transpose = partial(ops.transpose, axes=[0, 1, 2] if data_format =='channels_first' else [0, 2, 1])
-        self.rfft_fn = rfft
-        self.irfft_fn = irfft
-        self.rfft_scaling = None  # is determined during build routine!
+        fft_module = import_module(name="...ops.fft", package=__package__)
+        self.rfft_fn = getattr(fft_module, "rfft" if self.rank == 1 else f"rfft{self.rank}")
+        self.irfft_fn = getattr(fft_module, "irfft" if self.rank == 1 else f"irfft{self.rank}")
 
-    def build(self, input_shape: tuple) -> None:
-        if self.built:
-            return
+        # checks
+        if self.filters is not None and self.filters <= 0:
+            raise ValueError(
+                "Invalid value for argument `filters`. Expected a strictly "
+                f"positive value. Received filters={self.filters}."
+            )
         
-        modes = (self.modes, ) if isinstance(self.modes, int) else tuple(self.modes)  # work with tuple for dimensions
-
-        # get scaling factor for rfft and irfft operations
-        feature_dimension = [input_shape[a] for a in self.data_axes]
-        self.rfft_scaling = ops.cast(ops.prod(feature_dimension), dtype=self.dtype) / 2.0
-
-        # get scaling for weight initialization
-        in_channels = input_shape[-1]
-        scale = 1.0 / (in_channels * self.filters)  # convention due to original paper
-
-        self.real_weights = self.add_weight(
-            shape=(in_channels, *modes, self.filters),
-            initializer=initializers.HeNormal(),
-            # initializer=initializers.RandomUniform(minval=-scale, maxval=scale),
-            regularizer=self.kernel_regularizer,
-            trainable=True,
-            name='real_weights'
-        )
-        self.imag_weights = self.add_weight(
-            shape=(in_channels, *modes, self.filters),
-            initializer=initializers.HeNormal(),
-            # initializer=initializers.RandomUniform(minval=-scale, maxval=scale),
-            regularizer=self.kernel_regularizer,
-            trainable=True,
-            name='imag_weights'
-        )
-        if self.use_bias:
-            self.bias = self.add_weight(
-                shape=(self.filters, ), 
-                initializer=initializers.Zeros(),
-                regularizer=self.bias_regularizer,
-                trainable=True, 
-                name='bias'
+        if not all(self.modes):
+            raise ValueError(
+                "The argument `modes` cannot contain 0. Received "
+                f"modes={self.modes}."
+            )
+        
+        if self.data_format == "channels_first":
+            raise NotImplementedError(
+                "Data format 'channels_first' is currently not supported."
+                "\nNVIDIA recommends to use 'channels_last' anyway! Deal with it!"
             )
 
-        self.pad_width = (
-            (0, 0),
-            *[(0, s // 2 + 1 - m if i == (len(modes) - 1) else s - m) for i, (m, s) in enumerate(zip(modes, input_shape[1:]))],
-            (0, 0)
-        )
+    def build(self, input_shape):
+        if self.built:
+            return
 
+        # get data axes
+        if self.data_format == "channels_last":
+            channel_axis = -1
+            input_channel = input_shape[-1]
+
+            # pad (0,0) for `batch` and `channels`-dimensions.
+            # input_shape = [batch, *features, channels] --> ((0, 0), *pad, (0, 0))
+            self.pad_width = (  
+                (0, 0),
+                *[(0, s // 2 + 1 - m if i == (len(self.modes) - 1) else s - m) for i, (m, s) in enumerate(zip(self.modes, input_shape[1:]))],
+                (0, 0)
+            )
+
+            # if data format is `"channels_last"`, we have to transpose in order to apply the rfft and irfft along the last axes
+            axes = list(range(len(input_shape)))
+            transpose_axes = axes.copy()
+            inverse_transpose_axes = axes.copy()
+
+            transpose_axes.insert(1, transpose_axes.pop(-1))
+            inverse_transpose_axes.append(inverse_transpose_axes.pop(1))
+
+            self.transpose_op = partial(ops.transpose, axes=transpose_axes)
+            self.inverse_transpose_op = partial(ops.transpose, axes=inverse_transpose_axes)
+
+        else:
+            # NOTE this does not matter too much since currently the layer is restricted to use `"channels_last"` data format!
+            channel_axis = 1
+            input_channel = input_shape[1]
+
+            # pad (0,0) for `batch` and `channels`-dimensions.
+            # input_shape = [batch, channels, *features] --> ((0, 0), (0, 0), *pad)
+            self.pad_width = (
+                (0, 0),
+                (0, 0), 
+                *[(0, s // 2 + 1 - m if i == (len(self.modes) - 1) else s - m) for i, (m, s) in enumerate(zip(self.modes, input_shape[2:]))]
+            )
+
+            # if data format is already `"channels_first"`, we do not have to transpose in order to apply the rfft and irfft
+            self.transpose_op = lambda x: x
+            self.inverse_transpose_op = lambda x: x
+
+        # check pad with
         if list(filter(lambda x: x < (0, 0), self.pad_width)):
                 raise ValueError("Too many modes for input shape!")
+        
+        self.input_spec = InputSpec(
+            min_ndim=self.rank + 2, axes={channel_axis: input_channel}
+        )
 
-        # declare einsum operation
-        einsum_dim = ''.join([d for _, d in zip(modes, ['X', 'Y', 'Z'])])
-        self.einsum_op_forward = f'b{einsum_dim}i,i{einsum_dim}o->b{einsum_dim}o'
-        self.einsum_op_backprop_weights = f'b{einsum_dim}o,b{einsum_dim}i->i{einsum_dim}o'
-        self.einsum_op_backprop_x = f'b{einsum_dim}o,i{einsum_dim}o->b{einsum_dim}i'
-        self.einsum_op_backprop_bias = f'b{einsum_dim}o->o'  # sum over all axis except output channels
+        kernel_shape = (input_channel, self.filters, *self.modes)
 
-        self.mode_truncation_slice = tuple([slice(None), *[slice(None, m) for m in modes]])
+        # define real- and imaginary weights
+        self._real_kernel = self.add_weight(
+            name="real_kernel",
+            shape=kernel_shape,
+            initializer=self.kernel_initializer,
+            regularizer=self.kernel_regularizer,
+            constraint=self.kernel_constraint,
+            trainable=True,
+            dtype=self.dtype
+        )
+        self._imag_kernel = self.add_weight(
+            name="imag_kernel",
+            shape=kernel_shape,
+            initializer=self.kernel_initializer,
+            regularizer=self.kernel_regularizer,
+            constraint=self.kernel_constraint,
+            trainable=True,
+            dtype=self.dtype
+        )
 
+        if self.use_bias:
+            self.bias = self.add_weight(
+                name="bias",
+                shape=(self.filters,),
+                initializer=self.bias_initializer,
+                regularizer=self.bias_regularizer,
+                constraint=self.bias_constraint,
+                trainable=True,
+                dtype=self.dtype
+            )
+        else:
+            self.bias = None
+
+        """
+        The layer operates in the complex Fourier space.
+        Here, it is always `data_format="channels_first"`, such that the RFFT can be applied along the last axis or axes.
+
+        Now, we need a slice object to truncate the mode / reduce the complex data to the relevant modes.
+        The first two dimensions are the batch and the channel/filters. Then come the modes.
+
+        In 1-D, the RFFT output is just `[0, *positive_freqs]`, shape is `(batch, channels, n // 2 + 1)`.
+
+        In 2-D, we have a 2-D output with shape `(batch, channels, n, n // 2 + 1)`,
+        because we have only positive frequencies in `x` but the full spectrum in `y`.
+
+        we can apply an fftshift along the first feature dimension, which would make things way easier!
+        In `y`-direction, we will then have `[*negative_freqs, 0, *positive_freqs]`.
+
+        Note that the modes have to be doubled in order to see `m` positive and negative modes!
+
+        """
+        feature_axes = axes.copy()
+        feature_axes.pop(0)  # remove batch dimension
+        feature_axes.pop(-1 if self.data_format == "channels_last" else 1)  # remove channel dimension
+
+        self.feature_axes = feature_axes
+        self.feature_dims = tuple(input_shape[a] for a in self.feature_axes)
+
+        # self.fft_shift = lambda x: ops.roll()
+        self.mode_truncation_slice = tuple([slice(None), slice(None), *[slice(None, m) for m in self.modes]])
+
+        # declare einsum operation to apply weights
+        einsum_dim = "".join([d for _, d in zip(self.modes, ["X", "Y", "Z"])])  # einsum dimensions are just letters for each mode, i.e., "XY" for modes=(8, 16)
+        self.einsum_op_forward = f"b{einsum_dim}i,i{einsum_dim}o->b{einsum_dim}o"
+
+        if backend == "tensorflow":
+            # Backpropagation with `tensorflow` backend is a bit cumbersome and requires the exact gradient flow.
+            # Therefore, we must declare additional `einsum_ops`.
+            self.einsum_op_backprop_weights = f"b{einsum_dim}o,b{einsum_dim}i->i{einsum_dim}o"
+            self.einsum_op_backprop_x = f"b{einsum_dim}o,i{einsum_dim}o->b{einsum_dim}i"
+            self.einsum_op_backprop_bias = f"b{einsum_dim}o->o"  # sum over all axis except output channels
 
         self.built = True
 
-    def rfft(self, x: KerasTensor) -> Tuple[KerasTensor, KerasTensor]:
-        x = self.transpose_to_channels_first(x)
+    def rfft(self, x):
+        """
+        Performs fast Fourier transform on the real-valued `inputs`.
+        
+        Parameters
+        ----------
+        inputs : KerasTensor
+            Real-valued input tensor.
+        
+        Returns
+        -------
+        (y_real, y_imag) : (KerasTensor, KerasTensor)
+            Real- and imaginary part of fast Fourier tranform applied to `inputs`.
+
+        Notes
+        -----
+        `inputs` must be of shape `(batch, channels, *features)`.
+
+        """
+        
+        x = self.transpose_op(x)
         x_real, x_imag = self.rfft_fn(x)
 
-        # scale outputs for numerical stability in Fourier space
-        x_real /= self.rfft_scaling
-        x_imag /= self.rfft_scaling
+        # # scale outputs for numerical stability in Fourier space
+        # x_real /= self.rfft_scaling
+        # x_imag /= self.rfft_scaling
 
-        return self.inverse_transpose(x_real), self.inverse_transpose(x_imag)
+        return x_real, x_imag
     
-    def irfft(self, x: Tuple[KerasTensor, KerasTensor]) -> KerasTensor:
-        x_real, x_imag = x
-        x_real = self.transpose_to_channels_first(x_real)
-        x_imag = self.transpose_to_channels_first(x_imag)
+    def irfft(self, inputs):
+        """
+        Performs inverse fast Fourier transform on the `inputs`.
+        
+        Parameters
+        ----------
+        inputs : tuple
+            Tuple of `KerasTensor` (real and imaginary part).
+        
+        Returns
+        -------
+        outputs : KerasTensor
+            Real-valued output of inverse fast Fourier transform applied to `inputs`.
+
+        Notes
+        -----
+        `inputs` must be of shape `((batch, channels, *features), (batch, channels, *features))`.
+
+        """
+
+        x_real, x_imag = inputs
         y_real = self.irfft_fn((x_real, x_imag))
 
-        # scale back to "normal" scale
-        y_real *= self.rfft_scaling
-        return self.inverse_transpose(y_real)
+        # # scale back to "normal" scale
+        # y_real *= self.rfft_scaling
 
-    def call(self, x: KerasTensor):
-        NotImplemented
+        return self.inverse_transpose_op(y_real)
 
-    def compute_output_shape(self, input_shape: tuple) -> tuple:
+    def rfft_shift(self, inputs):
+        for _, a, n in zip(range(len(self.feature_axes) - 1), self.feature_axes, self.feature_dims):
+            inputs = ops.roll(inputs, shift=n // 2, axis=a)
+
+        return inputs
+    
+    def call(self, inputs):
+        if backend == "tensorflow":
+            """
+            
+            Parameters
+            ----------
+            inputs : KerasTensor
+                Input to `SpectralConv1D` layer.
+
+            Returns
+            -------
+            (y, grad) : (KerasTensor, callable)
+                Tuple of the output of `SpectralConv1D` and the gradient.
+
+            """
+
+            @ops.custom_gradient
+            def forward(inputs):
+                """
+                Custom gradient for `tensorflow` backend
+            
+                Parameters
+                ----------
+                inputs : KerasTensor
+                    Input to `SpectralConv1D` layer.
+
+                Returns
+                -------
+                (y, grad) : (KerasTensor, callable)
+                    Tuple of the output of `SpectralConv1D` and the gradient.
+                    
+                """
+                
+                x_hat_real, x_hat_imag = self.rfft(inputs)  # shape = (None, ch_in, *dims), where dims = [nx // 2 + 1] for 1-D and [ny, nx // 2 + 1] for 2-D
+
+                # apply fft shift
+                x_hat_real = self.rfft_shift(x_hat_real)
+                x_hat_imag = self.rfft_shift(x_hat_imag)
+
+                # reduce to relevant modes
+                x_hat_real_truncated = x_hat_real[self.mode_truncation_slice]  # shape = (None, ch_in, *m)
+                x_hat_imag_truncated = x_hat_imag[self.mode_truncation_slice]  # shape = (None, ch_in, *m)
+
+                y_hat_real_truncated = ops.einsum(self.einsum_op_forward, x_hat_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_hat_imag_truncated, self._imag_kernel)
+                y_hat_imag_truncated = ops.einsum(self.einsum_op_forward, x_hat_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_hat_imag_truncated, self._imag_kernel)
+
+                y_hat_real = ops.pad(y_hat_real_truncated, pad_width=self.pad_width)  # shape = (None, ch_out, *n)
+                y_hat_imag = ops.pad(y_hat_imag_truncated, pad_width=self.pad_width)  # shape = (None, ch_out, *n)
+
+                # add bias, shape = (None, ch_out, *m)
+                if self.use_bias:
+                    y_hat_real += self.bias
+                    y_hat_imag += self.bias
+
+                # apply ifft shift
+                y_hat_real = self.rfft_shift(y_hat_real)
+                y_hat_imag = self.rfft_shift(y_hat_imag)
+
+                # reconstruct y via irfft
+                y = self.irfft((y_hat_real, y_hat_imag))  # shape = (None, *input_dims, ch_out)
+
+                def backprop(dy, variables=None):
+                    """
+                    Backpropagation through the `SpectralConv1D` layer
+
+                    Parameters
+                    ----------
+                    dy : KerasTensor
+                        Gradient of `y`.
+                    variables : list, optional
+                        List of variables.
+                        Defaults to `None`
+
+                    Returns
+                    -------
+                    (dx, dw) : (KerasTensor, list)
+                        Tuple of the gradient of `x` and a list containing the gradients of the weights.
+                    
+                    """
+
+                    # get real and imaginary part via rfft, shape = (None, x//2+1, ch_out)
+                    dy_hat_real, dy_hat_imag = self.rfft(dy)
+                    
+                    # apply fft shift
+                    dy_hat_real = self.rfft_shift(dy_hat_real)
+                    dy_hat_imag = self.rfft_shift(dy_hat_imag)
+
+                    # reduce to relevant modes, shape = (None, m, ch_out)
+                    dy_hat_real_truncated = dy_hat_real[self.mode_truncation_slice]
+                    dy_hat_imag_truncated = dy_hat_imag[self.mode_truncation_slice]
+
+                    # compute gradients for weights, shape = (ch_in, m, ch_out)
+                    dw_real = ops.einsum(self.einsum_op_backprop_weights, dy_hat_real_truncated, x_hat_real_truncated) + ops.einsum(self.einsum_op_backprop_weights, dy_hat_imag_truncated, x_hat_imag_truncated)
+                    dw_imag = ops.einsum(self.einsum_op_backprop_weights, dy_hat_real_truncated, x_hat_imag_truncated) - ops.einsum(self.einsum_op_backprop_weights, dy_hat_imag_truncated, x_hat_real_truncated)
+
+                    if self.use_bias:
+                        # compute gradients for bias, shape = (ch_out, )
+                        db = ops.einsum(self.einsum_op_backprop_bias, dy_hat_real_truncated + dy_hat_imag_truncated)
+
+                    # compute gradient for inputs, shape = (None, m, ch_in)
+                    dx_hat_real_truncated = ops.einsum(self.einsum_op_backprop_x, dy_hat_real_truncated, self._real_kernel) + ops.einsum(self.einsum_op_backprop_x, dy_hat_imag_truncated, self._imag_kernel)
+                    dx_hat_imag_truncated = ops.einsum(self.einsum_op_backprop_x, dy_hat_imag_truncated, self._real_kernel) - ops.einsum(self.einsum_op_backprop_x, dy_hat_real_truncated, self._imag_kernel)
+
+                    # pad for ifft, shape = (None, x, ch_in)
+                    dx_hat_real = ops.pad(dx_hat_real_truncated, pad_width=self.pad_width)
+                    dx_hat_imag = ops.pad(dx_hat_imag_truncated, pad_width=self.pad_width)
+
+                    # apply ifft shift
+                    dx_hat_real = self.rfft_shift(dx_hat_real)
+                    dx_hat_imag = self.rfft_shift(dx_hat_imag)
+
+                    # apply irfft, shape = (None, x, ch_in)
+                    dx = self.irfft((dx_hat_real, dx_hat_imag))
+                    if self.use_bias:
+                        return dx, [db, dw_real, dw_imag]
+                    
+                    return dx, [dw_real, dw_imag]
+
+                return y, backprop
+                
+            return forward(inputs)
+
+        if backend == "jax":
+            """
+            
+            Parameters
+            ----------
+            inputs : KerasTensor
+                Input to `SpectralConv1D` layer.
+
+            Returns
+            -------
+            y : KerasTensor
+                The output of `SpectralConv1D`.
+
+            """
+
+            # forward pass, shape = (None, x, y, ch_in)
+            x_hat_real, x_hat_imag = self.rfft(inputs)
+
+            # apply fft shift
+            x_hat_real = self.rfft_shift(x_hat_real)
+            x_hat_imag = self.rfft_shift(x_hat_imag)
+
+            # reduce to relevant modes, shape = (None, mx, my, ch_in)
+            x_hat_real_reduced = x_hat_real[self.mode_truncation_slice]  # 1D: (batch, m, ch_out), 2D: (batch, mx, my, ch_in)
+            x_hat_imag_reduced = x_hat_imag[self.mode_truncation_slice]  # 1D: (batch, m, ch_out), 2D: (batch, mx, my, ch_in)
+
+            y_hat_real_truncated = ops.einsum(self.einsum_op_forward, x_hat_real_reduced, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_hat_imag_reduced, self._imag_kernel)
+            y_hat_imag_truncated = ops.einsum(self.einsum_op_forward, x_hat_real_reduced, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_hat_imag_reduced, self._imag_kernel)
+
+            y_hat_real = ops.pad(y_hat_real_truncated, pad_width=self.pad_width)
+            y_hat_imag = ops.pad(y_hat_imag_truncated, pad_width=self.pad_width)
+
+            # add bias, shape = (None, mx, my, ch_out)
+            if self.use_bias:
+                y_hat_real += self.bias
+                y_hat_imag += self.bias
+
+            # apply ifft shift
+            y_hat_real = self.rfft_shift(y_hat_real)
+            y_hat_imag = self.rfft_shift(y_hat_imag)
+
+            # reconstruct y via irfft, shape = (None, x, y, ch_out)
+            y = self.irfft((y_hat_real, y_hat_imag))
+
+            return y
+
+        raise NotImplementedError(f"The call method is only implemented for keras backends `'tensorflow'` and `'jax'`")
+
+    def compute_output_shape(self, input_shape):
+        """
+        Compute output shape of `BaseSpectralConv`
+
+        Parameters
+        ----------
+        input_shape : tuple
+            Input shape.
+
+        Returns
+        -------
+        output_shape : tuple
+            Output shape.
+
+        """
+
         input_shape: list = list(input_shape)
         channel_axis = -1 if self.data_format == 'channels_last' else 1
 
         input_shape[channel_axis] = self.filters
         return tuple(input_shape)
 
-    def get_config(self) -> dict:
-        # https://keras.io/guides/serialization_and_saving/
-        config: dict = super().get_config()
+    def get_config(self):
+        """
+        Get config method.
+        Required for serialization.
+
+        Returns
+        -------
+        config : dict
+            Dictionary with the configuration of `BaseSpectralConv`.
+
+        Notes
+        -----
+        The `config` does not contain the `self.rank` parameter,
+        which is not required when the class is subclassed with hard-coded `rank`.
+
+        """
+        
+        config = super().get_config()
         config.update({
-            'filters': self.filters,
-            'modes': self.modes,
-            'data_format': self.data_format,
-            'kernel_regularizer': regularizers.serialize(self.kernel_regularizer),
-            'bias_regularizer': regularizers.serialize(self.bias_regularizer),
-            'use_bias': self.use_bias
+            "filters": self.filters,
+            "modes": self.modes,
+            "data_format": self.data_format,
+            "use_bias": self.use_bias,
+            "kernel_initializer": initializers.serialize(self.kernel_initializer),
+            "bias_initializer": initializers.serialize(self.bias_initializer),
+            "kernel_constraint": constraints.serialize(self.kernel_constraint),
+            "bias_constraint": constraints.serialize(self.bias_constraint),
+            "kernel_regularizer": regularizers.serialize(self.kernel_regularizer),
+            "bias_regularizer": regularizers.serialize(self.bias_regularizer)
         })
         return config
-    
 
-class BaseSpectralConv2D(BaseSpectralConv1D):
-    def __init__(
-        self, 
-        filters: int, 
-        modes: int = None, 
-        modes_x: int = None, 
-        modes_y: int = None, 
-        name: str = None, 
-        kernel_regularizer: regularizers.Regularizer = None, 
-        bias_regularizer: regularizers.Regularizer = None, 
-        activity_regularizer: regularizers.Regularizer = None, 
-        data_format: str = 'channels_last', 
-        **kwargs
-    ):
-        super().__init__(
-            filters=filters, 
-            modes=modes,
-            name=name, 
-            kernel_regularizer=kernel_regularizer,
-            bias_regularizer=bias_regularizer,
-            activity_regularizer=activity_regularizer,
-            data_format=data_format, 
-            **kwargs
-        )
-        if (self.modes is None) & (modes_x is None) & (modes_y is None):
-            raise ValueError(f"Not all modes can be None. Please define either 'modes' (global) or 'modes_x' and 'modes_y'")
-        
-        # overwrite self.modes
-        self.modes = (modes_y or modes, modes_x or modes)  # for me, x is the 'shorter' dimension after rfft --> not intuitive!
-        self.data_axes = (-3, -2)  # for convolution with channels last
+    @classmethod
+    def from_config(cls, config):
+        """
+        Necessary for Keras deserialization
 
-        # callables
-        self.transpose_to_channels_first = partial(ops.transpose, axes=[0, 1, 2, 3] if data_format =='channels_first' else [0, 3, 1, 2])
-        self.inverse_transpose = partial(ops.transpose, axes=[0, 1, 2, 3] if data_format =='channels_first' else [0, 2, 3, 1])
-        self.rfft_fn = rfft2
-        self.irfft_fn = irfft2
+        Parameters
+        ----------
+        cls : BasBaseSpectralConvFCN
+            The `BaseSpectralConv` class.
+        config : dict
+            Dictionary with the layer configuration.
 
-    def build(self, input_shape: Tuple) -> None:
-        super().build(input_shape)
+        Returns
+        -------
+        cls : BaseSpectralConv
+            Instance of `BaseSpectralConv` from `config`.
+            
+        """
 
-        # remove deprecated class attributes from 1D implementation
-        delattr(self, 'mode_truncation_slice')
-        delattr(self, 'pad_width')
-        
-        modes_y, modes_x = self.modes
+        kernel_initializer_cfg = config.pop("kernel_initialzer")
+        bias_initializer_cfg = config.pop("bias_initialzer")
+        kernel_constraint_cfg = config.pop("kernel_constraint")
+        bias_constraint_cfg = config.pop("bias_constraint")
+        kernel_regularizer_cfg = config.pop("kernel_regularizer")
+        bias_regularizer_cfg = config.pop("bias_regularizer")
 
-        if not modes_y % 2 == 0:
-            raise ValueError(f"Odd number of y-modes is currently not supported by {self.name}, received y_modes={modes_y}.")
-
-        # truncation
-        self.mode_truncation_slice_pos = tuple([slice(None), slice(None, modes_y // 2), slice(None, modes_x)])
-        self.mode_truncation_slice_neg = tuple([slice(None), slice(-(modes_y // 2), None), slice(None, modes_x)])
-
-        # padding
-        self.pad_width_pos = (
-            (0, 0),
-            (0, (input_shape[1] - modes_y) // 2),
-            (0, input_shape[2] // 2 + 1 - modes_x),
-            (0, 0)
-        )
-        self.pad_width_neg = (
-            (0, 0),
-            ((input_shape[1] - modes_y) // 2, 0),
-            (0, input_shape[2] // 2 + 1 - modes_x),
-            (0, 0)
-        )
-
-        for pw in [self.pad_width_pos, self.pad_width_neg]:
-            if list(filter(lambda x: x < (0, 0), pw)):
-                raise ValueError("Too many modes for input shape!")
-
-    def get_config(self) -> dict:
-        config: dict = super().get_config()
         config.update({
-            'modes_x': self.modes[1],
-            'modes_y': self.modes[0],
+            "kernel_initializer": initializers.deserialize(kernel_initializer_cfg),
+            "bias_initializer": initializers.deserialize(bias_initializer_cfg),
+            "kernel_constraint": constraints.deserialize(kernel_constraint_cfg),
+            "bias_constraint": constraints.deserialize(bias_constraint_cfg),
+            "kernel_regularizer": regularizers.deserialize(kernel_regularizer_cfg),
+            "bias_regularizer": regularizers.deserialize(bias_regularizer_cfg)
         })
-        return config
+
+        return cls(**config)

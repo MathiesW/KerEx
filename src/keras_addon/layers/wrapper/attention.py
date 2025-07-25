@@ -171,6 +171,7 @@ class SpatialAttention(layers.Wrapper):
             Dictionary with the configuration of `SpatialAttention`.
 
         """
+        
         config: dict = super().get_config()
         config.update({
             "num_heads": self.num_heads,
