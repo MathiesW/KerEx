@@ -7,7 +7,6 @@ from keras.src.layers.input_spec import InputSpec
 from keras.src.backend.config import backend
 from keras.src.backend import standardize_data_format
 from keras.src.utils.argument_validation import standardize_tuple
-from typing import Tuple
 from importlib import import_module
 from functools import partial
 
@@ -74,14 +73,6 @@ class BaseSpectralConv(Layer):
             channel_axis = -1
             input_channel = input_shape[-1]
 
-            # pad (0,0) for `batch` and `channels`-dimensions.
-            # input_shape = [batch, *features, channels] --> ((0, 0), *pad, (0, 0))
-            self.pad_width = (  
-                (0, 0),
-                *[(0, s // 2 + 1 - m if i == (len(self.modes) - 1) else s - m) for i, (m, s) in enumerate(zip(self.modes, input_shape[1:]))],
-                (0, 0)
-            )
-
             # if data format is `"channels_last"`, we have to transpose in order to apply the rfft and irfft along the last axes
             axes = list(range(len(input_shape)))
             transpose_axes = axes.copy()
@@ -98,19 +89,16 @@ class BaseSpectralConv(Layer):
             channel_axis = 1
             input_channel = input_shape[1]
 
-            # pad (0,0) for `batch` and `channels`-dimensions.
-            # input_shape = [batch, channels, *features] --> ((0, 0), (0, 0), *pad)
-            self.pad_width = (
-                (0, 0),
-                (0, 0), 
-                *[(0, s // 2 + 1 - m if i == (len(self.modes) - 1) else s - m) for i, (m, s) in enumerate(zip(self.modes, input_shape[2:]))]
-            )
-
             # if data format is already `"channels_first"`, we do not have to transpose in order to apply the rfft and irfft
             self.transpose_op = lambda x: x
             self.inverse_transpose_op = lambda x: x
 
         # check pad with
+        self.pad_width = (
+                (0, 0),
+                (0, 0), 
+                *[(0, s // 2 + 1 - m if i == (len(self.modes) - 1) else s - m) for i, (m, s) in enumerate(zip(self.modes, input_shape[(1 if self.data_format == "channels_last" else 2):]))]
+            )
         if list(filter(lambda x: x < (0, 0), self.pad_width)):
                 raise ValueError("Too many modes for input shape!")
         
@@ -143,7 +131,7 @@ class BaseSpectralConv(Layer):
         if self.use_bias:
             self.bias = self.add_weight(
                 name="bias",
-                shape=(self.filters,),
+                shape=(self.filters,) + (1,) * self.rank,
                 initializer=self.bias_initializer,
                 regularizer=self.bias_regularizer,
                 constraint=self.bias_constraint,
@@ -173,24 +161,23 @@ class BaseSpectralConv(Layer):
         """
         feature_axes = axes.copy()
         feature_axes.pop(0)  # remove batch dimension
-        feature_axes.pop(-1 if self.data_format == "channels_last" else 1)  # remove channel dimension
+        feature_axes.pop(channel_axis)  # -1 if self.data_format == "channels_last" else 1)  # remove channel dimension
 
-        self.feature_axes = feature_axes
-        self.feature_dims = tuple(input_shape[a] for a in self.feature_axes)
+        self.feature_dims = tuple(input_shape[a] for a in feature_axes)
 
         # self.fft_shift = lambda x: ops.roll()
         self.mode_truncation_slice = tuple([slice(None), slice(None), *[slice(None, m) for m in self.modes]])
 
         # declare einsum operation to apply weights
         einsum_dim = "".join([d for _, d in zip(self.modes, ["X", "Y", "Z"])])  # einsum dimensions are just letters for each mode, i.e., "XY" for modes=(8, 16)
-        self.einsum_op_forward = f"b{einsum_dim}i,i{einsum_dim}o->b{einsum_dim}o"
+        self.einsum_op_forward = f"bi{einsum_dim},io{einsum_dim}->bo{einsum_dim}"
 
         if backend == "tensorflow":
             # Backpropagation with `tensorflow` backend is a bit cumbersome and requires the exact gradient flow.
             # Therefore, we must declare additional `einsum_ops`.
-            self.einsum_op_backprop_weights = f"b{einsum_dim}o,b{einsum_dim}i->i{einsum_dim}o"
-            self.einsum_op_backprop_x = f"b{einsum_dim}o,i{einsum_dim}o->b{einsum_dim}i"
-            self.einsum_op_backprop_bias = f"b{einsum_dim}o->o"  # sum over all axis except output channels
+            self.einsum_op_backprop_weights = f"bo{einsum_dim},bi{einsum_dim}->io{einsum_dim}"
+            self.einsum_op_backprop_x = f"bo{einsum_dim},io{einsum_dim}->bi{einsum_dim}"
+            self.einsum_op_backprop_bias = f"bo{einsum_dim}->o"  # sum over all axis except output channels
 
         self.built = True
 
@@ -252,13 +239,28 @@ class BaseSpectralConv(Layer):
         return self.inverse_transpose_op(y_real)
 
     def rfft_shift(self, inputs):
-        for _, a, n in zip(range(len(self.feature_axes) - 1), self.feature_axes, self.feature_dims):
-            inputs = ops.roll(inputs, shift=n // 2, axis=a)
+        """
+        Shifts the Fourier transformed data about `modes` in all directions except `x`.
+
+        Parameters
+        ----------
+        inputs : KerasTensor
+            Real-valued input tensor.
+
+        shifted_inputs : KerasTensor
+            Shifted version of `inputs`
+
+        """
+        
+        shape = ops.ndim(inputs)
+
+        for a, m in zip(range(len(self.modes), shape - 1), self.modes):
+            inputs = ops.roll(inputs, shift=-m // 2, axis=a)
 
         return inputs
     
     def call(self, inputs):
-        if backend == "tensorflow":
+        if backend() == "tensorflow":
             """
             
             Parameters
@@ -379,7 +381,7 @@ class BaseSpectralConv(Layer):
                 
             return forward(inputs)
 
-        if backend == "jax":
+        if backend() == "jax":
             """
             
             Parameters
