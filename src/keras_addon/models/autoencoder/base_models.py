@@ -324,7 +324,6 @@ class BaseFCN(models.Model, _IterableVars):
     def get_config(self) -> dict:
         config: dict = super().get_config()
         config.update({
-            "rank": self.rank,
             "filters": self.filters,
             "kernel_size": self.kernel_size,
             "padding": self.padding,
@@ -348,7 +347,24 @@ class BaseFCN(models.Model, _IterableVars):
         return config
     
     @classmethod
-    def from_config(cls, config: dict):
+    def from_config(cls, config):
+        """
+        Necessary for Keras deserialization
+
+        Parameters
+        ----------
+        cls : BaseFCN
+            The `BaseFCN` class.
+        config : dict
+            Dictionary with the layer configuration.
+
+        Returns
+        -------
+        cls : BaseFCN
+            Instance of `BaseFCN` from `config`.
+            
+        """
+
         activation_cfg = config.pop("activation")
         merge_layer_cfg = config.pop("merge_layer")
         kernel_initializer_cfg = config.pop("kernel_initializer")

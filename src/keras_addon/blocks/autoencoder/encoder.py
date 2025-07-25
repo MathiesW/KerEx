@@ -116,21 +116,6 @@ class Encoder1D(BaseEncoder):
             name=name, 
             **kwargs
         )
-
-    def get_config(self):
-        """
-        Necessary for Keras serialization
-
-        Returns
-        -------
-        config : dict
-            Dictionary with the layer configuration.
-
-        """
-
-        config = super().get_config()
-        config.pop("rank")
-        return config
     
 
 @saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Encoder2D")
@@ -242,21 +227,6 @@ class Encoder2D(BaseEncoder):
             **kwargs
         )
 
-    def get_config(self):
-        """
-        Necessary for Keras serialization
-
-        Returns
-        -------
-        config : dict
-            Dictionary with the layer configuration.
-
-        """
-
-        config = super().get_config()
-        config.pop("rank")
-        return config
-
 
 @saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Encoder3D")
 class Encoder3D(BaseEncoder):
@@ -366,18 +336,3 @@ class Encoder3D(BaseEncoder):
             name=name, 
             **kwargs
         )
-
-    def get_config(self):
-        """
-        Necessary for Keras serialization
-
-        Returns
-        -------
-        config : dict
-            Dictionary with the layer configuration.
-
-        """
-
-        config = super().get_config()
-        config.pop("rank")
-        return config

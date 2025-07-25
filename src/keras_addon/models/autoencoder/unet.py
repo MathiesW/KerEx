@@ -138,12 +138,6 @@ class Unet1D(BaseUnet):
             **kwargs
         )
 
-    def get_config(self) -> dict:
-        config: dict = super().get_config()
-        config.pop("rank")
-
-        return config
-    
 
 @saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="Unet2D")
 class Unet2D(BaseUnet):
@@ -269,12 +263,6 @@ class Unet2D(BaseUnet):
             name=name,
             **kwargs
         )
-
-    def get_config(self) -> dict:
-        config: dict = super().get_config()
-        config.pop("rank")
-
-        return config
 
 
 @saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="Unet3D")
@@ -407,9 +395,3 @@ class Unet3D(BaseUnet):
             name=name,
             **kwargs
         )
-
-    def get_config(self) -> dict:
-        config: dict = super().get_config()
-        config.pop("rank")
-
-        return config

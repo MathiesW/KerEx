@@ -144,12 +144,6 @@ class FCN1D(BaseFCN):
             **kwargs
         )
 
-    def get_config(self) -> dict:
-        config: dict = super().get_config()
-        config.pop("rank")
-
-        return config
-
 
 @saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="FCN2D")
 class FCN2D(BaseFCN):
@@ -288,12 +282,6 @@ class FCN2D(BaseFCN):
             **kwargs
         )
 
-    def get_config(self) -> dict:
-        config: dict = super().get_config()
-        config.pop("rank")
-
-        return config
-
 
 @saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="FCN3D")
 class FCN3D(BaseFCN):
@@ -431,10 +419,4 @@ class FCN3D(BaseFCN):
             name=name,
             **kwargs
         )
-
-    def get_config(self) -> dict:
-        config: dict = super().get_config()
-        config.pop("rank")
-
-        return config
     

@@ -112,21 +112,6 @@ class Decoder1D(BaseDecoder):
             name=name, 
             **kwargs
         )
-
-    def get_config(self):
-        """
-        Necessary for Keras serialization
-
-        Returns
-        -------
-        config : dict
-            Dictionary with the layer configuration.
-
-        """
-
-        config = super().get_config()
-        config.pop("rank")
-        return config
     
 
 @saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Decoder2D")
@@ -234,21 +219,6 @@ class Decoder2D(BaseDecoder):
             **kwargs
         )
 
-    def get_config(self):
-        """
-        Necessary for Keras serialization
-
-        Returns
-        -------
-        config : dict
-            Dictionary with the layer configuration.
-
-        """
-
-        config = super().get_config()
-        config.pop("rank")
-        return config
-
 
 @saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Decoder3D")
 class Decoder3D(BaseDecoder):
@@ -354,18 +324,3 @@ class Decoder3D(BaseDecoder):
             name=name, 
             **kwargs
         )
-
-    def get_config(self):
-        """
-        Necessary for Keras serialization
-
-        Returns
-        -------
-        config : dict
-            Dictionary with the layer configuration.
-
-        """
-
-        config = super().get_config()
-        config.pop("rank")
-        return config

@@ -270,7 +270,6 @@ class BaseEncoder(layers.Layer, _IterableVars):
 
         config: dict = super().get_config()
         config.update({
-            "rank": self.rank,
             "filters": self.filters,
             "kernel_size": self.kernel_size,
             "strides": self.strides,
@@ -311,6 +310,7 @@ class BaseEncoder(layers.Layer, _IterableVars):
         -------
         cls : BaseEncoder
             Instance of `BaseEncoder` from `config`.
+            
         """
 
         # get configs of keras objects

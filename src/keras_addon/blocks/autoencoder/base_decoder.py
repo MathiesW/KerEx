@@ -305,7 +305,6 @@ class BaseDecoder(layers.Layer, _IterableVars):
 
         config: dict = super().get_config()
         config.update({
-            "rank": self.rank,
             "filters": self.filters,
             "kernel_size": self.kernel_size,
             "strides": self.strides,
