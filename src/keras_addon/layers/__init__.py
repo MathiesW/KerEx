@@ -1,4 +1,4 @@
-from .fno import SpectralConv1D, SpectralConv2D
+from .fno import FNO1D, FNO2D
 
 from .merge import AttentionGate
 

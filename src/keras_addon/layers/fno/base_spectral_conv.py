@@ -12,6 +12,10 @@ from functools import partial
 
 
 class BaseSpectralConv(Layer):
+    """
+    https://arxiv.org/abs/2010.08895
+    
+    """
     def __init__(
         self,
         rank,
@@ -131,7 +135,7 @@ class BaseSpectralConv(Layer):
         if self.use_bias:
             self.bias = self.add_weight(
                 name="bias",
-                shape=(self.filters,) + (1,) * self.rank,
+                shape=(self.filters,),  #  + (1,) * self.rank,
                 initializer=self.bias_initializer,
                 regularizer=self.bias_regularizer,
                 constraint=self.bias_constraint,
@@ -165,12 +169,23 @@ class BaseSpectralConv(Layer):
 
         self.feature_dims = tuple(input_shape[a] for a in feature_axes)
 
-        # self.fft_shift = lambda x: ops.roll()
+        # derive rfft shift arguments using `ops.roll`
+        # shift have to be (-m // 2 for m in modes) for all modes but the last
+        # axis have to be all feature axes except for the last!
+        rfft_shifts = [-m // 2 for m in self.modes]
+        rfft_shifts.pop(-1)  # remove last 
+        self.rfft_shifts = tuple(rfft_shifts)
+
+        shift_axes = feature_axes.copy()
+        shift_axes.pop(-1)  # remove last axis
+        self.shift_axes = tuple(shift_axes)
+        
         self.mode_truncation_slice = tuple([slice(None), slice(None), *[slice(None, m) for m in self.modes]])
 
         # declare einsum operation to apply weights
         einsum_dim = "".join([d for _, d in zip(self.modes, ["X", "Y", "Z"])])  # einsum dimensions are just letters for each mode, i.e., "XY" for modes=(8, 16)
         self.einsum_op_forward = f"bi{einsum_dim},io{einsum_dim}->bo{einsum_dim}"
+        self.einsum_op_bias = f"bo{einsum_dim},o->bo{einsum_dim}"
 
         if backend == "tensorflow":
             # Backpropagation with `tensorflow` backend is a bit cumbersome and requires the exact gradient flow.
@@ -251,18 +266,61 @@ class BaseSpectralConv(Layer):
             Shifted version of `inputs`
 
         """
+
+        if self.rank == 1:
+            # if `self.rank==1`, we do not have to shift the inputs!
+            return inputs
         
-        shape = ops.ndim(inputs)
+        return ops.roll(inputs, shift=self.rfft_shifts, axis=self.shift_axes)
+        
+        # shape = ops.ndim(inputs)
 
-        for a, m in zip(range(len(self.modes), shape - 1), self.modes):
-            inputs = ops.roll(inputs, shift=-m // 2, axis=a)
+        # for a, m in zip(range(len(self.modes), shape - 1), self.modes):
+        #     inputs = ops.roll(inputs, shift=-m // 2, axis=a)
 
-        return inputs
+        # return inputs
     
     def call(self, inputs):
+        """
+        Forward (and backprop) of BaseSpectralConv layer
+
+        The layer first applies a RFFT, truncates the data such that only `self.modes` remain,
+        applies the weights, pads the truncated data to match its initial shape.
+        The padded data is then transformed using an IRFFT call.
+
+        Since the RFFT and IRFFT are applied along the last axes by default,
+        the `inputs` are always transposed to `data_format="channels_first"`,
+        and the `outputs` are eventually transformed back to the initial `data_format`.
+
+        Tensorflow can now handle the RFFT and IRFFT calls.
+        Hence, the backprop has to be explicitly defined here.
+        Thus, when using `backend()="tensorflow"`, this function returns both,
+        the output of the spectral convolution `y` and the gradient function `grad`.
+        
+        Parameters
+        ----------
+        inputs : KerasTensor
+            Input to `SpectralConv1D` layer.
+
+        Returns
+        -------
+        y | (y, grad) : KerasTensor | (KerasTensor, callable)
+            If Tensorflow backend is used, the function returns a tuple of the output of spectral convolution `y` and the gradient `grad`.
+            If JAX backend is used, this function returns only the output of the spectral conv `y`
+
+        Notes
+        -----
+        Since Keras does not have native support for complex dtypes,
+        the real- and imaginary parts are handled as two real-valued tensors of `self.dtype`.
+        Hence, there are two real-valued weights, `self._real_kernel` and `self._imag_kernel`,
+        which are applied to the respective inputs.
+        The bias is shared among real- and imaginary parts.
+
+        """
+
         if backend() == "tensorflow":
             """
-            
+
             Parameters
             ----------
             inputs : KerasTensor
@@ -310,8 +368,8 @@ class BaseSpectralConv(Layer):
 
                 # add bias, shape = (None, ch_out, *m)
                 if self.use_bias:
-                    y_hat_real += self.bias
-                    y_hat_imag += self.bias
+                    y_hat_real = ops.einsum(self.einsum_op_bias, y_hat_real, self.bias)
+                    y_hat_imag = ops.einsum(self.einsum_op_bias, y_hat_imag, self.bias)
 
                 # apply ifft shift
                 y_hat_real = self.rfft_shift(y_hat_real)
@@ -415,8 +473,8 @@ class BaseSpectralConv(Layer):
 
             # add bias, shape = (None, mx, my, ch_out)
             if self.use_bias:
-                y_hat_real += self.bias
-                y_hat_imag += self.bias
+                y_hat_real = ops.einsum(self.einsum_op_bias, y_hat_real, self.bias)
+                y_hat_imag = ops.einsum(self.einsum_op_bias, y_hat_imag, self.bias)
 
             # apply ifft shift
             y_hat_real = self.rfft_shift(y_hat_real)
