@@ -165,7 +165,7 @@ class Residual(layers.Wrapper):
 
         """
 
-        config: dict = super().get_config()
+        config = super().get_config()
         config.update({
             "merge_layer": saving.serialize_keras_object(self.merge_layer),
             "residual_layer": saving.serialize_keras_object(self.residual_layer)
