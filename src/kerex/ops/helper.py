@@ -117,6 +117,7 @@ def large_negative_number(dtype):
         Large negative number with dtype `dtype` (-1e9 for `dtype="float32"`, -3e4 for `dtype=float16"`).
     
     """
+    
     if backend.standardize_dtype(dtype) == "float16":
         return -3e4
     return -1e9
@@ -126,17 +127,51 @@ def index_to_einsum_variable(i):
     """Coverts an index to a einsum variable name.
 
     We simply map indices to lowercase characters, e.g. 0 -> 'a', 1 -> 'b'.
+
     """
+
     return string.ascii_lowercase[i]
 
 
-def unwrap(phase: KerasTensor, axis=-1) -> KerasTensor:
+def unwrap(phase: KerasTensor, axis=-1, period=2*pi) -> KerasTensor:
+    """
+    Unwrap by taking the complement of large deltas with respect to the period.
+    Inspired by https://numpy.org/doc/stable/reference/generated/numpy.unwrap.html
+
+    Parameters
+    ----------
+    phase : KerasTensor
+        Input array.
+    axis : int, optional
+        Axis along which unwrap will operater.
+        Defaults to the last axis.
+    period : float, optional
+        Size of the range over which the input wraps. By default, it is
+        `2*pi`.
+
+    Returns
+    -------
+    out : KerasTensor
+        Output array.
+
+    Examples
+    --------
+    >>> from keras import ops
+    >>> from math import pi
+    >>> phase = ops.linspace(0, pi, 5) + ops.array([0.0, 0.0, 0.0, pi, pi])
+    >>> ops.convert_to_numpy(phase)
+    array([0.       , 0.7853982, 1.5707964, 5.4977875, 6.2831855], dtype=float32)
+    >>> ops.convert_to_numpy(unwrap(phase))
+    array([ 0.      , 0.7853982, 1.5707964, -0.785398, 0.       ], dtype=float32)
+
+    """
+
     nd = ops.ndim(phase)
 
     # get phase difference and correction
     phase_diff = ops.diff(phase, axis=axis)
-    jumps = ops.cast(phase_diff < -pi, dtype="int8") - ops.cast(phase_diff > pi, dtype="int8")
-    correction = ops.cumsum(ops.cast(jumps, dtype="float32") * 2.0 * pi, axis=axis)
+    jumps = ops.cast(phase_diff < -period / 2, dtype="int8") - ops.cast(phase_diff > period / 2, dtype="int8")
+    correction = ops.cumsum(ops.cast(jumps, dtype="float32") * period, axis=axis)
 
     # pad to original size
     pad_width = [(0, 0)] * nd
