@@ -61,8 +61,8 @@ def _fft(x: tuple, fn: callable, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
 
 # === real valued FFT ===
-def _rfft(x: jnp.ndarray, fn: callable) -> Tuple[jnp.ndarray, jnp.ndarray]:
-    complex_output = fn(x)
+def _rfft(x: jnp.ndarray, fn: callable, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    complex_output = fn(x, **kwargs)
     return jnp.real(complex_output), jnp.imag(complex_output)
 
 
@@ -106,7 +106,7 @@ def rfft2_fn(x):
 
 
 def rfft3_fn(x):
-    return partial(_fft, fn=jnp.fft.rfftn, axes=(-3, -2, -1))(x)
+    return partial(_rfft, fn=jnp.fft.rfftn, axes=(-3, -2, -1))(x)
 
 
 def irfft_fn(x, n=None):
