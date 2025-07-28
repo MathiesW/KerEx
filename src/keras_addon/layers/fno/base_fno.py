@@ -15,7 +15,7 @@ class BaseFNO(layers.Layer):
         rank,
         filters,
         modes,
-        activation="relu",
+        activation="gelu",
         merge_layer="add",
         data_format="channels_last",
         use_bias=True,

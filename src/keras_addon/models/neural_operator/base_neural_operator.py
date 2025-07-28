@@ -8,8 +8,64 @@ from ...ops.helper import _IterableVars
 
 class BaseNeuralOperator(models.Model, _IterableVars):
     """
-     	
-    https://doi.org/10.48550/arXiv.2010.08895
+    BaseNeuralOperator, cf. [Zongyi etl al.](https://doi.org/10.48550/arXiv.2010.08895)
+
+    Parameters
+    ----------
+    rank : int {1, 2}
+        Rank of `BaseNeuralOperator`. Must be within {1, 2}.
+    filters : int | list | tuple
+        Number of filters for the sequential FNO layers.
+        If this is a list/tuple, the length of this argument determines the number of FNO layers.
+    modes : int | list | tuple
+        Number of Fourier modes for FNO layers.
+        An `int` results in global `modes`, a `list` allows to define the `modes` per FNO layer.
+        For `rank>1`, the `modes` can be defined in terms of tuples, 
+        where each entry determines the modes in the respective direction,
+        e.g., `modes=(8, 4)` will result in 8 modes in y, and 4 modes in x-direction.
+    input_projection_dimension : int, optional
+        Projection dimension for the input layer.
+        If `None`, `input_projection_dimension` is set to the first argument in `filters`.
+        Defaults to `None`.
+    output_projection_dimension : int, optional
+        Projection dimension for the output layer.
+        If `None`, `output_projection_dimension` restores the initial channel dimension of the input data.
+        Defaults to `None`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `"channels_last"`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Merge operation in FNO layers to combine the result from the spectral convolution with the result from the bypass convolution.
+        Defaults to `"add"`.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Global activation function.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"gelu"`.
+    use_bias : bool, optional
+        If `True`, all layers use a bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the model.
+        If `None`, `name` is automatically inherited from the class name `"BaseNeuralOperator"`.
+        Defaults to `None`.
 
     """
 
@@ -22,7 +78,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         output_projection_dimension=None,
         data_format="channels_last",
         merge_layer="add",
-        activation="relu",
+        activation="gelu",
         use_bias=True,
         kernel_initializer="he_normal",
         bias_initializer="zeros",
@@ -58,8 +114,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         )
 
         # define layers
-        conv_kwargs = dict(
-            kernel_size=1, 
+        layer_kwargs = dict(
             data_format=self.data_format, 
             use_bias=self.use_bias,
             kernel_initializer=self.kernel_initializer,
@@ -73,23 +128,28 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         self.input_projection = BaseConv(
             rank=self.rank, 
             filters=self.input_projection_dimension or self.filters[0], 
+            kernel_size=1, 
             name="input_projection",
-            **conv_kwargs
+            **layer_kwargs
         )
 
         self.fno_layers = models.Sequential([
             BaseFNO(
                 rank=self.rank, 
                 filters=f, 
-                modes=m
+                modes=m,
+                activation=self.activation,
+                merge_layer=self.merge_layer,
+                **layer_kwargs
             ) for f, m in zip(self.filters, self.modes)
         ], name="fno_layers")
 
         self.output_projection = BaseConv(
             rank=self.rank, 
             filters=self.output_projection_dimension or 1,  # this is updated in build method IF self.output_projection_filters is None
+            kernel_size=1, 
             name="output_projection",
-            **conv_kwargs
+            **layer_kwargs
         )
 
     def build(self, input_shape):
