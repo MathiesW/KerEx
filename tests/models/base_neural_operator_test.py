@@ -15,7 +15,7 @@ def test_modes_as_tuple(rank):
 
 @pytest.mark.parametrize("merge_layer", ["concatenate", "add", "average"])
 def test_merge_layers(merge_layer):
-    x = ops.ones((1, 16, 3))
+    x = ops.ones((1, 16, 3), dtype="float32")
     model = BaseModel(rank=1, filters=DEFAULT_FILTERS, modes=DEFAULT_MODES, merge_layer=merge_layer)
     model.build(input_shape=x.shape)
 
@@ -24,7 +24,7 @@ def test_merge_layers(merge_layer):
 
 @pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
 def test_data_formats(data_format):
-    x = ops.ones((1, 16, 3) if data_format == "channels_last" else (1, 3, 16))
+    x = ops.ones((1, 16, 3) if data_format == "channels_last" else (1, 3, 16), dtype="float32")
     model = BaseModel(rank=1, filters=DEFAULT_FILTERS, modes=DEFAULT_MODES, data_format=data_format)
     model.build(input_shape=x.shape)
 
@@ -33,7 +33,7 @@ def test_data_formats(data_format):
 
 @pytest.mark.parametrize("rank", [1, 2, 3])
 def test_output_shape_is_correct(rank):
-    x = ops.ones(tuple([1, *[16] * rank, 3]))
+    x = ops.ones(tuple([1, *[16] * rank, 3]), dtype="float32")
 
     model = BaseModel(rank=rank, filters=DEFAULT_FILTERS, modes=DEFAULT_MODES)
     model.build(input_shape=x.shape)
@@ -57,7 +57,7 @@ def test_zero_modes_raise_ValueError(rank):
 def test_modes_greater_data_raise_ValueError(rank):
     size = 16
 
-    x = ops.ones((1, *[size] * rank, 3))
+    x = ops.ones((1, *[size] * rank, 3), dtype="float32")
     model = BaseModel(rank=rank, filters=DEFAULT_FILTERS, modes=size // 2 + 2)
 
     with pytest.raises(ValueError):
