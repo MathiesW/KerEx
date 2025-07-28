@@ -91,6 +91,24 @@ class BaseFNO(layers.Layer):
 
         return x
     
+    def compute_output_shape(self, input_shape):
+        """
+        Compute output shape of `BaseNeuralOperator`
+
+        Parameters
+        ----------
+        input_shape : tuple
+            Input shape.
+
+        Returns
+        -------
+        output_shape : tuple
+            Output shape.
+
+        """
+        
+        return self.forward.compute_output_shape(input_shape=input_shape)        
+    
     def get_config(self):
         config = super().get_config()
         config.update({
