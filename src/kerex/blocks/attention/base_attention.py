@@ -1,4 +1,5 @@
-from keras import saving, layers, Layer
+from keras import saving
+from keras import layers
 from keras.src import ops
 
 
@@ -221,7 +222,7 @@ class MultiHeadAttention(layers.MultiHeadAttention):
 
 
 @saving.register_keras_serializable(package="KerasAddon.Layers.Attention", name="BaseAttention")
-class BaseAttention(Layer):
+class BaseAttention(layers.Layer):
     """
     Base multihead-attention layer as described in the paper "Attention is all you Need" [Vaswani et al., 2017](https://arxiv.org/abs/1706.03762).
     
@@ -296,9 +297,9 @@ class BaseAttention(Layer):
         ):
         super().__init__()
 
-        self.mha: Layer = MultiHeadAttention(num_heads, key_dim, value_dim, dropout, use_bias, output_shape, attention_axes, kernel_initializer, bias_initializer, kernel_regularizer, bias_regularizer, activity_regularizer, kernel_constraint, bias_constraint, seed, **kwargs)
-        self.layernorm: Layer = layers.LayerNormalization()
-        self.add: Layer = layers.Add()
+        self.mha = MultiHeadAttention(num_heads, key_dim, value_dim, dropout, use_bias, output_shape, attention_axes, kernel_initializer, bias_initializer, kernel_regularizer, bias_regularizer, activity_regularizer, kernel_constraint, bias_constraint, seed, **kwargs)
+        self.layernorm = layers.LayerNormalization()
+        self.add = layers.Add()
 
     def build(self, query_shape, value_shape, key_shape=None):
         """
