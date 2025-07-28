@@ -6,7 +6,7 @@ from keras import constraints
 from keras import saving
 from ...layers.conv.base_conv import BaseConv
 from ...layers.wrapper import Residual
-from .base_spectral_conv import BaseSpectralConv
+from .spectral_conv.base_spectral_conv import BaseSpectralConv
 
 
 class BaseFNO(layers.Layer):
