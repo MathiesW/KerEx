@@ -1,4 +1,4 @@
-from keras_addon.models.autoencoder.base_models import BaseUnet as BaseModel
+from kerex.models.autoencoder.base_models import BaseUnet as BaseModel
 from keras import ops
 from keras.src.backend.config import backend
 import pytest
@@ -45,6 +45,21 @@ def test_merge_layers(merge_layer):
     model(x)
 
 
+@pytest.mark.parametrize("rank", [1, 2, 3])
+def test_output_shape_is_correct(rank):
+    x = ops.ones(tuple([1, *[16] * rank, 3]))
+
+    model = BaseModel(rank=rank)
+    model.build(input_shape=x.shape)
+
+    expected_output_shape = model.compute_output_shape(input_shape=x.shape)
+
+    y = model(x)
+    actual_output_shape = y.shape
+
+    assert expected_output_shape == actual_output_shape, f"Expected output shape ({expected_output_shape}) deviates from actual output shape ({actual_output_shape})!"
+
+
 """ check for error raising """
 @pytest.mark.parametrize("rank", [1, 2, 3])
 def test_padding_mode_valid_raise_ValueError(rank):
@@ -67,21 +82,14 @@ def test_rank_higher_than_three():
             model(x)
 
 
-""" serialization """
-...
+""" training behavior """
+@pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
+def test_backprop(data_format):
+    x = ops.ones((1, 16, 16, 3) if data_format == "channels_last" else (1, 3, 16, 16))
+    y = ops.ones((1, 16, 16, 1) if data_format == "channels_last" else (1, 1, 16, 16))
 
-
-""" long tests """
-@pytest.mark.parametrize("rank", [1, 2, 3])
-def test_output_shape_is_correct(rank):
-    x = ops.ones(tuple([1, *[16] * rank, 3]))
-
-    model = BaseModel(rank=rank)
+    model = BaseModel(rank=2, data_format=data_format)
     model.build(input_shape=x.shape)
+    model.compile(optimizer="adam", loss="mse")
 
-    expected_output_shape = model.compute_output_shape(input_shape=x.shape)
-
-    y = model(x)
-    actual_output_shape = y.shape
-
-    assert expected_output_shape == actual_output_shape, f"Expected output shape ({expected_output_shape}) deviates from actual output shape ({actual_output_shape})!"
+    model.fit(x=x, y=y, epochs=10, batch_size=1)

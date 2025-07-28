@@ -105,7 +105,7 @@ def rfft2_fn(x):
     return partial(_rfft, fn=jnp.fft.rfft2)(x)
 
 
-def ifft3_fn(x):
+def rfft3_fn(x):
     return partial(_fft, fn=jnp.fft.rfftn, axes=(-3, -2, -1))(x)
 
 
@@ -121,6 +121,6 @@ def irfft2_fn(x, n=None):
     return y_real
 
 
-def irfft2_fn(x, n=None):
+def irfft3_fn(x, n=None):
     y_real, _ = partial(_irfft, fn=jnp.fft.irfftn, s=n, axes=(-3, -2, -1))(x)
     return y_real

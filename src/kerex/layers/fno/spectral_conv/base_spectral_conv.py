@@ -45,7 +45,7 @@ class BaseSpectralConv(Layer):
         self.bias_constraint = constraints.get(bias_constraint)
         self.data_format = standardize_data_format(data_format)
 
-        fft_module = import_module(name="...ops.fft", package=__package__)
+        fft_module = import_module(name="....ops.fft", package=__package__)
         self.rfft_fn = getattr(fft_module, "rfft" if self.rank == 1 else f"rfft{self.rank}")
         self.irfft_fn = getattr(fft_module, "irfft" if self.rank == 1 else f"irfft{self.rank}")
 
@@ -62,23 +62,18 @@ class BaseSpectralConv(Layer):
                 f"modes={self.modes}."
             )
         
-        if self.data_format == "channels_first":
-            raise NotImplementedError(
-                "Data format 'channels_first' is currently not supported."
-                "\nNVIDIA recommends to use 'channels_last' anyway! Deal with it!"
-            )
-
     def build(self, input_shape):
         if self.built:
             return
 
         # get data axes
+        axes = list(range(len(input_shape)))
+
         if self.data_format == "channels_last":
             channel_axis = -1
             input_channel = input_shape[-1]
 
             # if data format is `"channels_last"`, we have to transpose in order to apply the rfft and irfft along the last axes
-            axes = list(range(len(input_shape)))
             transpose_axes = axes.copy()
             inverse_transpose_axes = axes.copy()
 
@@ -135,7 +130,7 @@ class BaseSpectralConv(Layer):
         if self.use_bias:
             self.bias = self.add_weight(
                 name="bias",
-                shape=(self.filters,),  #  + (1,) * self.rank,
+                shape=(self.filters,), 
                 initializer=self.bias_initializer,
                 regularizer=self.bias_regularizer,
                 constraint=self.bias_constraint,
@@ -187,7 +182,7 @@ class BaseSpectralConv(Layer):
         self.einsum_op_forward = f"bi{einsum_dim},io{einsum_dim}->bo{einsum_dim}"
         self.einsum_op_bias = f"bo{einsum_dim},o->bo{einsum_dim}"
 
-        if backend == "tensorflow":
+        if backend() == "tensorflow":
             # Backpropagation with `tensorflow` backend is a bit cumbersome and requires the exact gradient flow.
             # Therefore, we must declare additional `einsum_ops`.
             self.einsum_op_backprop_weights = f"bo{einsum_dim},bi{einsum_dim}->io{einsum_dim}"
