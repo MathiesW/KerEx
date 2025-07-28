@@ -6,10 +6,10 @@ from keras import KerasTensor
 from typing import Union, Tuple
 
 if backend() == 'jax':
-    from .jax import fft_fn, ifft_fn, fft2_fn, ifft2_fn, rfft_fn, irfft_fn, rfft2_fn, irfft2_fn
+    from .jax import fft_fn, ifft_fn, fft2_fn, ifft2_fn, fft3_fn, ifft3_fn, rfft_fn, irfft_fn, rfft2_fn, irfft2_fn, rfft3_fn, irfft3_fn
 
 if backend() == 'tensorflow':
-    from .tensorflow import fft_fn, ifft_fn, fft2_fn, ifft2_fn, rfft_fn, irfft_fn, rfft2_fn, irfft2_fn
+    from .tensorflow import fft_fn, ifft_fn, fft2_fn, fft3_fn, ifft3_fn, ifft2_fn, rfft_fn, irfft_fn, rfft2_fn, irfft2_fn, rfft3_fn, irfft3_fn
 
 
 def cast_to_complex(x: Union[Tuple[KerasTensor, KerasTensor], KerasTensor]) -> Tuple[KerasTensor, KerasTensor]:
@@ -114,6 +114,17 @@ class FFT2(FFT):
         self.fft_fn = fft2_fn
 
 
+class FFT3(FFT):
+    """
+    3-D fast Fourier transform
+
+    """
+
+    def __init__(self):
+        super.__init__()
+        self.fft_fn = fft3_fn
+
+
 class RFFT(FFT):
     """
     1-D fast Fourier transform for real-valued inputs
@@ -134,6 +145,17 @@ class RFFT2(FFT):
     def __init__(self):
         super.__init__()
         self.fft_fn = rfft2_fn
+
+
+class RFFT3(FFT):
+    """
+    3-D fast Fourier transform for real-valued inputs
+
+    """
+
+    def __init__(self):
+        super.__init__()
+        self.fft_fn = rfft3_fn
 
 
 # === IFFT ===
@@ -157,6 +179,17 @@ class IFFT2(FFT):
     def __init__(self):
         super.__init__()
         self.fft_fn = ifft2_fn
+
+
+class IFFT3(FFT):
+    """
+    3-D inverse fast Fourier transform
+
+    """
+
+    def __init__(self):
+        super.__init__()
+        self.fft_fn = ifft3_fn
 
 
 class IRFFT(FFT):
@@ -213,6 +246,17 @@ class IRFFT2(IRFFT):
         self.fft_fn = irfft2_fn
 
 
+class IRFFT3(IRFFT):
+    """
+    3-D inverse fast Fourier transform for real-valued inputs
+
+    """
+
+    def __init__(self):
+        super.__init__()
+        self.fft_fn = irfft3_fn
+
+
 # === now make function wrapper ===
 # === forward FFT ===
 def fft(x):
@@ -231,7 +275,6 @@ def fft(x):
 
     Examples
     --------
-    >>> from ssp.keras.ops import fft
     >>> from keras import ops
     >>> signal = ops.array([-2, 8, 6, 4, 1, 0, 3, 5], dtype=float)
     >>> y_real, y_imag = fft(signal)
@@ -265,7 +308,6 @@ def fft2(x):
 
     Examples
     --------
-    >>> from ssp.keras.ops import fft2
     >>> from keras import ops
     >>> signal = ops.reshape(ops.array([-2, 8, 6, 12], dtype=float), (2, 2))
     >>> y_real, y_imag = fft2(signal)
@@ -287,6 +329,43 @@ def fft2(x):
     return fft2_fn(x)
 
 
+def fft3(x):
+    """
+    3-D fast Fourier transform
+
+    Parameters
+    ----------
+    x : KerasTensor | tuple | list
+        Real- or complex input to FFT. A complex input must be composed of a tuple or list of the real- and imaginary part `(x_real, x_imag)`.
+
+    Returns
+    -------
+    y_real, y_imag : (KerasTensor, KerasTensor)
+        Tuple of real- and imaginary part of FFT3(x).
+
+    Examples
+    --------
+    >>> from keras import ops
+    >>> signal = ops.reshape(ops.array([-2, 8, 6, 12], dtype=float), (2, 2))
+    >>> y_real, y_imag = fft3(signal)
+    >>> ops.convert_to_numpy(y_real)
+    array([
+        [ 16.,  -8.],
+        [ -4., -12.]
+    ], dtype=float32)
+    >>> ops.convert_to_numpy(y_imag)
+    array([
+        [0., 0.],
+        [0., 0.]
+    ], dtype=float32)
+
+    """
+    
+    if any_symbolic_tensors(cast_to_complex(x)):
+        return FFT3().symbolic_call(x)
+    return fft3_fn(x)
+
+
 def rfft(x):
     """
     1-D fast Fourier transform for real-valued inputs
@@ -304,7 +383,6 @@ def rfft(x):
 
     Examples
     --------
-    >>> from ssp.keras.ops import rfft
     >>> from keras import ops
     >>> signal = ops.array([-2, 8, 6, 4, 1, 0, 3, 5], dtype=float)
     >>> y_real, y_imag = rfft(signal)
@@ -337,7 +415,6 @@ def rfft2(x):
 
     Examples
     --------
-    >>> from ssp.keras.ops import rfft2
     >>> from keras import ops
     >>> signal = ops.reshape(ops.array([-2, 8, 6, 12, 4, 0, 2, 2, -2, 8, 6, 12, 4, 0, 2, 2], dtype=float), (4, 4))
     >>> y_real, y_imag = rfft2(signal)
@@ -361,6 +438,48 @@ def rfft2(x):
     if any_symbolic_tensors(cast_to_complex(x)):
         return RFFT2().symbolic_call(x)
     return rfft2_fn(x)
+
+
+def rfft3(x):
+    """
+    3-D fast Fourier transform for real-valued inputs
+
+    Parameters
+    ----------
+    x : KerasTensor
+        Real-valued input to FFT.
+
+    Returns
+    -------
+    y_real, y_imag : (KerasTensor, KerasTensor)
+        Tuple of real- and imaginary part of RFFT3(x).
+        Both have size (n, n // 1 + 1) given ops.shape(x) == (n, n)
+
+    Examples
+    --------
+    >>> from keras import ops
+    >>> signal = ops.reshape(ops.array([-2, 8, 6, 12, 4, 0, 2, 2, -2, 8, 6, 12, 4, 0, 2, 2], dtype=float), (4, 4))
+    >>> y_real, y_imag = rfft3(signal)
+    >>> ops.convert_to_numpy(y_real)
+    array([
+        [ 64., -12., -24.],
+        [  0.,   0.,   0.],
+        [ 32., -20., -40.],
+        [  0.,   0.,   0.]
+    ], dtype=float32)
+    >>> ops.convert_to_numpy(y_imag)
+    array([
+        [ 0., 12.,  0.],
+        [ 0.,  0.,  0.],
+        [ 0.,  4.,  0.],
+        [ 0.,  0.,  0.]
+    ], dtype=float32)
+
+    """
+
+    if any_symbolic_tensors(cast_to_complex(x)):
+        return RFFT3().symbolic_call(x)
+    return rfft3_fn(x)
 
 
 # === inverse FFT ===
@@ -406,7 +525,28 @@ def ifft2(x):
     return ifft2_fn(x)
 
 
-def irfft(x, n: tuple = None):
+def ifft3(x):
+    """
+    3-D inverse fast Fourier transform
+
+    Parameters
+    ----------
+    x : KerasTensor | tuple | list
+        Real- or complex input to FFT. A complex input must be composed of a tuple or list of the real- and imaginary part `(x_real, x_imag)`.
+
+    Returns
+    -------
+    y_real, y_imag : (KerasTensor, KerasTensor)
+        Tuple of real- and imaginary part of IFFT3(x).
+
+    """
+    
+    if any_symbolic_tensors(cast_to_complex(x)):
+        return IFFT3().symbolic_call(x)
+    return ifft3_fn(x)
+
+
+def irfft(x, n=None):
     """
     1-D inverse fast Fourier transform for real-valued inputs
 
@@ -414,6 +554,12 @@ def irfft(x, n: tuple = None):
     ----------
     x : KerasTensor | tuple | list
         Real- or complex input to FFT. A complex input must be composed of a tuple or list of the real- and imaginary part `(x_real, x_imag)`.
+    n : int, optional
+        Length of the transformed axis of the output. For `n` output points, `n//2+1` input points are necessary.
+        If the input is longer than tis, it is cropped.
+        If it is shorter than this, it is padded with zeros.
+        If `n` is not given, it is taken to be `2`(m-1)` where `m` is the length of the input along the axis specified by axis,
+        cf. https://numpy.org/doc/stable/reference/generated/numpy.fft.irfft.html
 
     Returns
     -------
@@ -428,7 +574,7 @@ def irfft(x, n: tuple = None):
     return irfft_fn(x, n=n)
 
 
-def irfft2(x, n: tuple = None):
+def irfft2(x, n=None):
     """
     2-D inverse fast Fourier transform for real-valued inputs
 
@@ -436,11 +582,18 @@ def irfft2(x, n: tuple = None):
     ----------
     x : KerasTensor | tuple | list
         Real- or complex input to FFT. A complex input must be composed of a tuple or list of the real- and imaginary part `(x_real, x_imag)`.
-
+    n : tuple, optional
+        Shape (length of each transformed axis) of the output.
+        `s` is also the number of input points used along this axis, except for the last axis,
+        where `s[-1]//2+1` points of the input are used.
+        Along any axis, if the shape indicated by `s` is smaller than that of the input, the input is cropped.
+        If it is larger, the input is padded with zeros,
+        cf. https://numpy.org/doc/stable/reference/generated/numpy.fft.irfftn.html
+        
     Returns
     -------
     y_real, y_imag : (KerasTensor, KerasTensor)
-        Tuple of real- and imaginary part of IRFFT(x).
+        Tuple of real- and imaginary part of IRFFT2(x).
         Both have size (n // 1 + 1, n) given ops.shape(x) == (n, n)
 
     """
@@ -448,3 +601,33 @@ def irfft2(x, n: tuple = None):
     if any_symbolic_tensors(cast_to_complex(x)):
         return IRFFT2().symbolic_call(x, n=n)
     return irfft2_fn(x, n=n)
+
+
+def irfft3(x, n=None):
+    """
+    3-D inverse fast Fourier transform for real-valued inputs
+
+    Parameters
+    ----------
+    x : KerasTensor | tuple | list
+        Real- or complex input to FFT. A complex input must be composed of a tuple or list of the real- and imaginary part `(x_real, x_imag)`.
+    n : tuple, optional
+        Shape (length of each transformed axis) of the output.
+        `s` is also the number of input points used along this axis, except for the last axis,
+        where `s[-1]//2+1` points of the input are used.
+        Along any axis, if the shape indicated by `s` is smaller than that of the input, the input is cropped.
+        If it is larger, the input is padded with zeros,
+        cf. https://numpy.org/doc/stable/reference/generated/numpy.fft.irfftn.html
+
+    Returns
+    -------
+    y_real, y_imag : (KerasTensor, KerasTensor)
+        Tuple of real- and imaginary part of IRFFT3(x).
+        Both have size (n // 1 + 1, n) given ops.shape(x) == (n, n)
+
+    """
+
+    if any_symbolic_tensors(cast_to_complex(x)):
+        return IRFFT3().symbolic_call(x, n=n)
+    return irfft3_fn(x, n=n)
+

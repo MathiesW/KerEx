@@ -97,16 +97,16 @@ def rfft3_fn(x):
     return partial(_rfft, fn=tf.signal.rfft3d)(x)
 
 
-def irfft_fn(x, n: tuple = None):
+def irfft_fn(x, n=None):
     y_real, _ = partial(_irfft, fn=tf.signal.irfft, n=n)(x)
     return y_real
 
 
-def irfft2_fn(x, n: tuple = None):
+def irfft2_fn(x, n=None):
     y_real, _ = partial(_irfft, fn=tf.signal.irfft2d, n=n)(x)
     return y_real
 
 
-def irfft3_fn(x, n: tuple = None):
+def irfft3_fn(x, n=None):
     y_real, _ = partial(_irfft, fn=tf.signal.irfft3d, n=n)(x)
     return y_real

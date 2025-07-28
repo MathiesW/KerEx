@@ -109,18 +109,18 @@ def ifft3_fn(x):
     return partial(_fft, fn=jnp.fft.rfftn, axes=(-3, -2, -1))(x)
 
 
-def irfft_fn(x, n: tuple = None):
+def irfft_fn(x, n=None):
     if isinstance(n, tuple):
         n, = n  # unpack tuple
     y_real, _ = partial(_irfft, fn=jnp.fft.irfft, n=n)(x)
     return y_real
 
 
-def irfft2_fn(x, n: tuple = None):
+def irfft2_fn(x, n=None):
     y_real, _ = partial(_irfft, fn=jnp.fft.irfft2, s=n)(x)
     return y_real
 
 
-def irfft2_fn(x, n: tuple = None):
+def irfft2_fn(x, n=None):
     y_real, _ = partial(_irfft, fn=jnp.fft.irfftn, s=n, axes=(-3, -2, -1))(x)
     return y_real
