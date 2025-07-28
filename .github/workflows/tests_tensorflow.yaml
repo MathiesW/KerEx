@@ -1,4 +1,4 @@
-name: Test
+name: Tensorflow Test
 
 on:
   push:
