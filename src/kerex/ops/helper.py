@@ -133,7 +133,7 @@ def index_to_einsum_variable(i):
     return string.ascii_lowercase[i]
 
 
-def unwrap(phase: KerasTensor, axis=-1, period=2*pi) -> KerasTensor:
+def unwrap(phase, axis=-1, period=2*pi):
     """
     Unwrap by taking the complement of large deltas with respect to the period.
     Inspired by https://numpy.org/doc/stable/reference/generated/numpy.unwrap.html
@@ -181,7 +181,7 @@ def unwrap(phase: KerasTensor, axis=-1, period=2*pi) -> KerasTensor:
     return phase + correction
 
 
-def capitalize_first_char(s: str):
+def capitalize_first_char(s):
     """
     Capitalize first character of string and leave the rest.
     
