@@ -236,7 +236,19 @@ class BaseFCN(models.Model, _IterableVars):
             )
         ]
 
-    def build(self, input_shape: tuple):
+    def build(self, input_shape):
+        """
+        Build method of `BaseFNO`
+
+        Builds all sub-modules and sets `self.built=True`.
+        
+        Parameters
+        ----------
+        input_shape : tuple
+            Input shape
+
+        """
+
         if self.built:
             return
         
@@ -315,13 +327,38 @@ class BaseFCN(models.Model, _IterableVars):
 
         return x
     
-    def compute_output_shape(self, input_shape: tuple) -> tuple:
+    def compute_output_shape(self, input_shape):
+        """
+        Compute output shape of `BaseFCN`
+
+        Parameters
+        ----------
+        input_shape : tuple
+            Input shape.
+
+        Returns
+        -------
+        output_shape : tuple
+            Output shape.
+
+        """
+
         output_shape = list(input_shape)
         output_shape[-1] = self.filters[0]
 
         return tuple(output_shape)
 
-    def get_config(self) -> dict:
+    def get_config(self):
+        """
+        Necessary for Keras serialization
+
+        Returns
+        -------
+        config : dict
+            Dictionary with the layer configuration.
+            
+        """
+
         config: dict = super().get_config()
         config.update({
             "filters": self.filters,
