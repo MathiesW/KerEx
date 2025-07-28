@@ -40,7 +40,7 @@ def test_data_formats(data_format):
         return
     
     x = ops.ones((1, 16, 3) if data_format == "channels_last" else (1, 3, 16), dtype="float32")
-    model = BaseModel(rank=1)
+    model = BaseModel(rank=1, data_format=data_format)
     model.build(input_shape=x.shape)
 
     model(x)
