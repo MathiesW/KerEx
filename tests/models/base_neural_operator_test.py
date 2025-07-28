@@ -1,5 +1,6 @@
 from kerex.models.neural_operator.base_neural_operator import BaseNeuralOperator as BaseModel
 from keras import ops
+from keras.src.backend.config import backend
 import pytest
 
 
@@ -24,6 +25,10 @@ def test_merge_layers(merge_layer):
 
 @pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
 def test_data_formats(data_format):
+    if (data_format == "channels_first") and (backend() == "tensorflow"):
+        # Tensorflow only supports NHWC on CPU says github. local test run fine, though
+        return
+    
     x = ops.ones((1, 16, 3) if data_format == "channels_last" else (1, 3, 16), dtype="float32")
     model = BaseModel(rank=1, filters=DEFAULT_FILTERS, modes=DEFAULT_MODES, data_format=data_format)
     model.build(input_shape=x.shape)
@@ -64,14 +69,18 @@ def test_modes_greater_data_raise_ValueError(rank):
         model.build(x.shape)
 
 
-# """ training behavior """
-# @pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
-# def test_backprop(data_format):
-#     x = ops.ones((1, 16, 16, 3) if data_format == "channels_last" else (1, 3, 16, 16))
-#     y = ops.ones((1, 16, 16, 1) if data_format == "channels_last" else (1, 1, 16, 16))
+""" training behavior """
+@pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
+def test_backprop(data_format):
+    if (data_format == "channels_first") and (backend() == "tensorflow"):
+        # Tensorflow only supports NHWC on CPU says github. local test run fine, though
+        return
+    
+    x = ops.ones((1, 16, 16, 3) if data_format == "channels_last" else (1, 3, 16, 16))
+    y = ops.ones((1, 16, 16, 1) if data_format == "channels_last" else (1, 1, 16, 16))
 
-#     model = BaseModel(rank=2, filters=4, modes=4, output_projection_dimension=1, data_format=data_format)
-#     model.build(input_shape=x.shape)
-#     model.compile(optimizer="adam", loss="mse")
+    model = BaseModel(rank=2, filters=4, modes=4, output_projection_dimension=1, data_format=data_format)
+    model.build(input_shape=x.shape)
+    model.compile(optimizer="adam", loss="mse")
 
-#     model.fit(x=x, y=y, epochs=10, batch_size=1)
+    model.fit(x=x, y=y, epochs=10, batch_size=1)

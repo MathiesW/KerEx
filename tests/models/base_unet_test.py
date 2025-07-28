@@ -45,6 +45,19 @@ def test_merge_layers(merge_layer):
     model(x)
 
 
+@pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
+def test_data_formats(data_format):
+    if (data_format == "channels_first") and (backend() == "tensorflow"):
+        # Tensorflow only supports NHWC on CPU says github. local test run fine, though
+        return
+    
+    x = ops.ones((1, 16, 3) if data_format == "channels_last" else (1, 3, 16), dtype="float32")
+    model = BaseModel(rank=1)
+    model.build(input_shape=x.shape)
+
+    model(x)
+
+
 @pytest.mark.parametrize("rank", [1, 2, 3])
 def test_output_shape_is_correct(rank):
     x = ops.ones(tuple([1, *[16] * rank, 3]))
@@ -82,14 +95,18 @@ def test_rank_higher_than_three():
             model(x)
 
 
-# """ training behavior """
-# @pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
-# def test_backprop(data_format):
-#     x = ops.ones((1, 16, 16, 3) if data_format == "channels_last" else (1, 3, 16, 16))
-#     y = ops.ones((1, 16, 16, 1) if data_format == "channels_last" else (1, 1, 16, 16))
+""" training behavior """
+@pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
+def test_backprop(data_format):
+    if (data_format == "channels_first") and (backend() == "tensorflow"):
+        # Tensorflow only supports NHWC on CPU says github. local test run fine, though
+        return
+    
+    x = ops.ones((1, 16, 16, 3) if data_format == "channels_last" else (1, 3, 16, 16))
+    y = ops.ones((1, 16, 16, 1) if data_format == "channels_last" else (1, 1, 16, 16))
 
-#     model = BaseModel(rank=2, data_format=data_format)
-#     model.build(input_shape=x.shape)
-#     model.compile(optimizer="adam", loss="mse")
+    model = BaseModel(rank=2, data_format=data_format)
+    model.build(input_shape=x.shape)
+    model.compile(optimizer="adam", loss="mse")
 
-#     model.fit(x=x, y=y, epochs=10, batch_size=1)
+    model.fit(x=x, y=y, epochs=10, batch_size=1)
