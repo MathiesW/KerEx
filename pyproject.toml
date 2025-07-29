@@ -1,6 +1,6 @@
 [project]
 name = "kerex"
-version = "1.0.0"
+version = "1.0.1"
 description = "Keras Extensions for Keras3"
 authors = [
   { name="Mathies Wedler", email="mathies.wedler@gmail.com" },
