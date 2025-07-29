@@ -319,9 +319,12 @@ class _IterableVars:
                     # wrap `ref_key` argument in list if it is not a tuple (iterable) already
                     if not isinstance(arg, tuple):
                         arg = [arg]
+            
+            # wrap arguments that come as nested list (happens after deserialization!) to a list of tuples
+            arg = [tuple(f) if isinstance(f, list) else f for f in arg]
 
             if not all(isinstance(f, (int, float, str, bool, tuple)) or (f is None) for f in arg):
-                raise ValueError(f"Received bad `{k}` argument. Expected all entries of `{k}` to be either `int`, `str`, `bool`, or `tuple`.")
+                raise ValueError(f"Received bad `{k}` argument ({arg}). Expected all entries of `{k}` to be either `int`, `str`, `bool`, or `tuple`.")
             
             if hasattr(self, ref_key):
                 if hasattr(self, "rank"):
