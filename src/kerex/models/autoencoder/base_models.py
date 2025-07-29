@@ -343,10 +343,25 @@ class BaseFCN(models.Model, _IterableVars):
 
         """
 
-        output_shape = list(input_shape)
-        output_shape[-1] = self.filters[0]
+        skip = []
+        for layer, layer_uses_skip in zip(self.encoder_layers, self.use_skip_connection):
+            if layer_uses_skip:
+                
+                input_shape, skip_shape = layer.compute_output_shape(input_shape=input_shape)
+                skip.append(skip_shape)
+            else:
+                input_shape = layer.compute_output_shape(input_shape=input_shape)
+                skip.append(None)
 
-        return tuple(output_shape)
+        # apply bottlebeck layer
+        if self.bottleneck is not None:
+            input_shape = self.bottleneck.compute_output_shape(input_shape=input_shape)
+
+        # forward path through decoder
+        for i, layer in enumerate(self.decoder_layers):
+            input_shape = layer.compute_output_shape(input_shape=input_shape, input_shape_skip=skip[len(self.decoder_layers) - i - 1])
+
+        return input_shape
 
     def get_config(self):
         """
