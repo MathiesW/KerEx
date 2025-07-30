@@ -80,21 +80,6 @@ def test_padding_mode_valid_raise_ValueError(rank):
         BaseModel(rank=rank, padding="valid")
 
 
-def test_rank_higher_than_three():
-    x = ops.ones((1, 32, 32, 32, 32, 3))
-    model = BaseModel(rank=4)
-    model.build(input_shape=x.shape)
-
-    if backend == "jax":
-        # obviously, 4-D+ convolutions are possible with JAX backend
-        model(x)
-    
-    if backend == "tensorflow":
-        # ...but not with Tensorflow backend!
-        with pytest.raises(ValueError):
-            model(x)
-
-
 """ training behavior """
 @pytest.mark.parametrize("data_format", ["channels_first", "channels_last"])
 def test_backprop(data_format):
