@@ -265,46 +265,6 @@ def get_layer(identifier, module="keras.layers", registered_name=None, **layer_k
         )
 
 
-# @saving.register_keras_serializable(package="KerasAddon.Helper", name="from_base_class")
-# def from_base_class(base_class, rank):
-#     """
-#     When layers are imported using this function, `model.summary()`, the names of subclassed base layers will be shown correctly
-
-#     Parameters
-#     ----------
-#     base_class : class
-#         The identifier for a layer to return.
-#     rank : int, {1, 2, 3}
-#         Rank of the instance of `base_class`.
-
-#     Returns
-#     -------
-#     out : instance of `base_class`
-#         An instance of `base_clas` with `rank`
-
-#     Examples
-#     --------
-#     An instance of the same layer is first initialized without and then with `from_base_class`.
-#     Note that `type(layer)` shows the correct name of the subclassed layer when using `from_base_class`.
-#     >>> from kerex.layers.fno.base_fno import BaseFNO
-#     >>> type(BaseFNO(rank=2, filters=8, modes=4))
-#     <class 'src.kerex.layers.fno.base_fno.BaseFNO'>
-#     >>> type(from_base_class(BaseFNO, rank=2)(filters=8, modes=4))
-#     <class 'src.kerex.ops.helper.FNO2D'>
-
-#     Notes
-#     -----
-#     Unfortunately, this function messes with the serialization, 
-#     since the module is changed from the actual layer to the module where this function is defined.
-
-#     """
-#     class_name = f"{base_class.__name__}{rank}D"
-#     try:
-#         return type(class_name.removeprefix("Base"), (base_class,), {"__init__": lambda self, **kwargs: base_class.__init__(self, rank=rank, **kwargs)})
-#     except ValueError:
-#         raise base_class
-
-
 class _IterableVars:
     """
     This class just provides basic functionality for convolutional blocks
