@@ -4,3 +4,4 @@ dist
 src/*.egg-info
 docs/_*/
 pypi_api_token
+playground
