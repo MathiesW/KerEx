@@ -271,7 +271,8 @@ class BaseSpectralConv(Layer):
             # if `self.rank==1`, we do not have to shift the inputs!
             return inputs
         
-        truncation_shifts = [-s for s in self._truncation_shifts] if inverse else self._truncation_shifts
+        truncation_shifts = tuple([-s for s in self._truncation_shifts]) if inverse else self._truncation_shifts
+
         return ops.roll(inputs, shift=truncation_shifts, axis=self.shift_axes)
     
     def call(self, inputs):
