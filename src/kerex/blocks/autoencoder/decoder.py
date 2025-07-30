@@ -92,7 +92,7 @@ class Decoder1D(BaseDecoder):
         ):
         assert padding in ["same", "causal"], f"Allowed padding types for `Decoder1D` are `'same'` and `'causal'`, received {padding}."
         super().__init__(
-            rank=2, 
+            rank=1, 
             filters=filters, 
             kernel_size=kernel_size, 
             strides=strides, 
