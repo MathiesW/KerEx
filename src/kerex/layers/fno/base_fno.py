@@ -4,9 +4,8 @@ from keras import initializers
 from keras import regularizers
 from keras import constraints
 from keras import saving
-from ...layers.conv.base_conv import BaseConv
 from ...layers.wrapper import Residual
-from .spectral_conv.base_spectral_conv import BaseSpectralConv
+from importlib import import_module
 
 
 class BaseFNO(layers.Layer):
@@ -43,8 +42,7 @@ class BaseFNO(layers.Layer):
         self.bias_regularizer = bias_regularizer
 
         self.forward = Residual(
-            layer=BaseSpectralConv(
-                rank=self.rank,
+            layer=getattr(import_module(name=".spectral_conv", package=__package__), f"SpectralConv{self.rank}D")(
                 filters=self.filters,
                 modes=self.modes,
                 data_format=self.data_format,
@@ -59,8 +57,7 @@ class BaseFNO(layers.Layer):
                 **kwargs
             ),
             merge_layer=self.merge_layer,
-            residual_layer=BaseConv(
-                rank=self.rank,
+            residual_layer=getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
                 filters=self.filters,
                 kernel_size=1,
                 data_format=self.data_format,

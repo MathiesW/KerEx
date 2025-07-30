@@ -5,7 +5,7 @@ from keras import regularizers
 from keras import constraints
 from keras import saving
 from ...ops.helper import _IterableVars
-from ...layers.conv import BaseConv
+from importlib import import_module
 
 
 class BaseEncoder(layers.Layer, _IterableVars):
@@ -134,8 +134,7 @@ class BaseEncoder(layers.Layer, _IterableVars):
 
         # define layers
         self.forward_conv = Sequential([
-            BaseConv(
-                rank=self.rank,
+            getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
                 filters=f,
                 kernel_size=k,
                 strides=s,
@@ -155,8 +154,7 @@ class BaseEncoder(layers.Layer, _IterableVars):
             ) for f, k, s, d, g in zip(self.filters, self.kernel_size, self.strides, self.dilation_rate, self.groups)
         ])
 
-        self.downsampling = BaseConv(
-            rank=self.rank,
+        self.downsampling = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
             filters=self.downsampling_filters,
             kernel_size=2,
             strides=2,

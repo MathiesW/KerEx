@@ -1,9 +1,8 @@
 from keras import models
 from keras import regularizers, initializers, constraints
 from keras import saving
-from ...blocks.autoencoder.base_encoder import BaseEncoder
-from ...blocks.autoencoder.base_decoder import BaseDecoder
 from ...ops.helper import _IterableVars
+from importlib import import_module
 
 
 class BaseFCN(models.Model, _IterableVars):
@@ -169,8 +168,7 @@ class BaseFCN(models.Model, _IterableVars):
 
     def set_encoder_layers(self):
         self.encoder_layers = [
-            BaseEncoder(
-                rank=self.rank,
+            getattr(import_module(name="...blocks.autoencoder", package=__package__), f"Encoder{self.rank}D")(
                 filters=f,
                 kernel_size=k,
                 strides=s,
@@ -204,8 +202,7 @@ class BaseFCN(models.Model, _IterableVars):
     
     def set_decoder_layers(self):
         self.decoder_layers = [
-            BaseDecoder(
-                rank=self.rank,
+            getattr(import_module(name="...blocks.autoencoder", package=__package__), f"Decoder{self.rank}D")(
                 filters=f,
                 kernel_size=k,
                 strides=s,

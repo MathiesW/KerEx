@@ -5,10 +5,9 @@ from keras import regularizers
 from keras import constraints
 from keras import saving
 from keras.src.layers.merging.base_merge import Merge
-
 from ...ops.helper import _IterableVars
-from ...layers.conv import BaseConv, BaseConvTranspose
 from ...ops import get_layer
+from importlib import import_module
 
 
 class BaseDecoder(layers.Layer, _IterableVars):
@@ -131,8 +130,7 @@ class BaseDecoder(layers.Layer, _IterableVars):
 
         # define layers
         self.forward_conv = Sequential([
-            BaseConv(
-                rank=self.rank,
+            getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
                 filters=f,
                 kernel_size=k,
                 strides=s,
@@ -152,8 +150,7 @@ class BaseDecoder(layers.Layer, _IterableVars):
             ) for f, k, s, d, g in zip(self.filters, self.kernel_size, self.strides, self.dilation_rate, self.groups)
         ])
 
-        self.upsampling = BaseConvTranspose(
-            rank=self.rank,
+        self.upsampling = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}DTranspose")(
             filters=self.upsampling_filters,
             kernel_size=2,
             strides=2,

@@ -1,9 +1,8 @@
 from keras import models
 from keras import regularizers, initializers, constraints
 from keras import saving
-from ...layers.conv.base_conv import BaseConv
-from ...layers.fno.base_fno import BaseFNO
 from ...ops.helper import _IterableVars
+from importlib import import_module
 
 
 class BaseNeuralOperator(models.Model, _IterableVars):
@@ -125,8 +124,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
             bias_constraint=self.bias_constraint
         )
 
-        self.input_projection = BaseConv(
-            rank=self.rank, 
+        self.input_projection = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
             filters=self.input_projection_dimension or self.filters[0], 
             kernel_size=1, 
             name="input_projection",
@@ -134,8 +132,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         )
 
         self.fno_layers = models.Sequential([
-            BaseFNO(
-                rank=self.rank, 
+            getattr(import_module(name="...layers", package=__package__), f"FNO{self.rank}D")(
                 filters=f, 
                 modes=m,
                 activation=self.activation,
@@ -144,8 +141,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
             ) for f, m in zip(self.filters, self.modes)
         ], name="fno_layers")
 
-        self.output_projection = BaseConv(
-            rank=self.rank, 
+        self.output_projection = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
             filters=self.output_projection_dimension or 1,  # this is updated in build method IF self.output_projection_filters is None
             kernel_size=1, 
             name="output_projection",
