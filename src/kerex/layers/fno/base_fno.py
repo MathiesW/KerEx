@@ -121,7 +121,7 @@ class BaseFNO(layers.Layer):
             "kernel_initializer": initializers.serialize(self.kernel_initializer),
             "bias_initializer": initializers.serialize(self.bias_initializer),
             "kernel_constraint": constraints.serialize(self.kernel_constraint),
-            "bias_constrain": constraints.serialize(self.bias_constraint),
+            "bias_constraint": constraints.serialize(self.bias_constraint),
             "kernel_regularizer": regularizers.serialize(self.kernel_regularizer),
             "bias_regularizer": regularizers.serialize(self.bias_regularizer)
         })
@@ -132,8 +132,8 @@ class BaseFNO(layers.Layer):
     def from_config(cls, config):
         activation_cfg = config.pop("activation")
         merge_layer_cfg = config.pop("merge_layer")
-        kernel_initializer_cfg = config.pop("kernel_initialzer")
-        bias_initializer_cfg = config.pop("bias_initialzer")
+        kernel_initializer_cfg = config.pop("kernel_initializer")
+        bias_initializer_cfg = config.pop("bias_initializer")
         kernel_constraint_cfg = config.pop("kernel_constraint")
         bias_constraint_cfg = config.pop("bias_constraint")
         kernel_regularizer_cfg = config.pop("kernel_regularizer")
