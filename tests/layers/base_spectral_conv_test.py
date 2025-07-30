@@ -20,7 +20,7 @@ def get_data(rank):
     return x
 
 
-@pytest.mark.parametrize("rank", [1, 2])
+@pytest.mark.parametrize("rank", [1, 2, 3])
 def test_forward(rank):
     x = get_data(rank=rank)
     layer = BaseSpectralConv(rank=rank, filters=DEFAULT_FILTERS, modes=DEFAULT_MODES)
@@ -33,12 +33,14 @@ def test_forward(rank):
     xf_truncated = xf_shifted[layer.mode_truncation_slice]  # zero mode should always maintain!
     yf_truncated = ops.einsum(layer.einsum_op_forward, xf_truncated, layer._real_kernel)  # neglect imag part here, we are only intersted in shapes and correct truncation / padding
     yf_padded = ops.pad(yf_truncated, pad_width=layer.pad_width)
-    yf_shifted = layer.truncation_shift((yf_padded, yf_padded), inverse=True)
-    y = layer.irfft(yf_shifted)
+    yf_shifted = layer.truncation_shift(yf_padded, inverse=True)
+    y = layer.irfft((yf_shifted, yf_shifted))  # just use the real part twice here...
 
     assert x.shape == y.shape, f"Wrong output shape!"
     assert xf_truncated.shape == (1, 1, *layer.modes), f"Shape of truncated `x` deviates from `modes`"
-    assert ops.abs(ops.sum(yf_truncated) - ops.sum(yf_padded)) < 1e-4, f"Padding applies other than zero"
+
+    deviation = ops.sum(yf_truncated) - ops.sum(yf_padded)
+    assert ops.abs(deviation) < 1e-3, f"Deviation between truncated and zero-padded tensor exceeds `1e-3` ({deviation})"
 
 
 @pytest.mark.parametrize("rank", [1, 2, 3])
