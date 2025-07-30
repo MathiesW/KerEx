@@ -80,8 +80,8 @@ class BaseSpectralConv(Layer):
             transpose_axes.insert(1, transpose_axes.pop(-1))
             inverse_transpose_axes.append(inverse_transpose_axes.pop(1))
 
-            self.transpose_op = partial(ops.transpose, axes=transpose_axes)
-            self.inverse_transpose_op = partial(ops.transpose, axes=inverse_transpose_axes)
+            self.transpose = partial(ops.transpose, axes=transpose_axes)
+            self.inverse_transpose = partial(ops.transpose, axes=inverse_transpose_axes)
 
         else:
             # NOTE this does not matter too much since currently the layer is restricted to use `"channels_last"` data format!
@@ -89,8 +89,8 @@ class BaseSpectralConv(Layer):
             input_channel = input_shape[1]
 
             # if data format is already `"channels_first"`, we do not have to transpose in order to apply the rfft and irfft
-            self.transpose_op = lambda x: x
-            self.inverse_transpose_op = lambda x: x
+            self.transpose = lambda x: x
+            self.inverse_transpose = lambda x: x
 
         # check pad with
         self.pad_width = (
@@ -165,14 +165,16 @@ class BaseSpectralConv(Layer):
         self.feature_dims = tuple(input_shape[a] for a in feature_axes)
 
         # derive rfft shift arguments using `ops.roll`
-        # shift have to be (-m // 2 for m in modes) for all modes but the last
+        # shift have to be (m // 2 for m in modes) for all modes but the last
         # axis have to be all feature axes except for the last!
-        rfft_shifts = [-m // 2 for m in self.modes]
-        rfft_shifts.pop(-1)  # remove last 
-        self.rfft_shifts = tuple(rfft_shifts)
+        _truncation_shifts = [m // 2 for m in self.modes]
+        _truncation_shifts.pop(-1)  # remove last since there is no shift in RFFTN along the last axis
+        self._truncation_shifts = tuple(_truncation_shifts)
 
         shift_axes = feature_axes.copy()
         shift_axes.pop(-1)  # remove last axis
+        if self.data_format == "channels_last":
+            shift_axes = [a + 1 for a in shift_axes]
         self.shift_axes = tuple(shift_axes)
         
         self.mode_truncation_slice = tuple([slice(None), slice(None), *[slice(None, m) for m in self.modes]])
@@ -211,7 +213,7 @@ class BaseSpectralConv(Layer):
 
         """
         
-        x = self.transpose_op(x)
+        x = self.transpose(x)
         x_real, x_imag = self.rfft_fn(x)
 
         # # scale outputs for numerical stability in Fourier space
@@ -246,9 +248,9 @@ class BaseSpectralConv(Layer):
         # # scale back to "normal" scale
         # y_real *= self.rfft_scaling
 
-        return self.inverse_transpose_op(y_real)
+        return self.inverse_transpose(y_real)
 
-    def rfft_shift(self, inputs):
+    def truncation_shift(self, inputs, inverse=False):
         """
         Shifts the Fourier transformed data about `modes` in all directions except `x`.
 
@@ -256,6 +258,9 @@ class BaseSpectralConv(Layer):
         ----------
         inputs : KerasTensor
             Real-valued input tensor.
+        inverse : bool, optional
+            Whether to invert the shift that was applied by calling `truncation_shift` once.
+            Defaults to `False`.
 
         shifted_inputs : KerasTensor
             Shifted version of `inputs`
@@ -266,14 +271,8 @@ class BaseSpectralConv(Layer):
             # if `self.rank==1`, we do not have to shift the inputs!
             return inputs
         
-        return ops.roll(inputs, shift=self.rfft_shifts, axis=self.shift_axes)
-        
-        # shape = ops.ndim(inputs)
-
-        # for a, m in zip(range(len(self.modes), shape - 1), self.modes):
-        #     inputs = ops.roll(inputs, shift=-m // 2, axis=a)
-
-        # return inputs
+        truncation_shifts = [-s for s in self._truncation_shifts] if inverse else self._truncation_shifts
+        return ops.roll(inputs, shift=truncation_shifts, axis=self.shift_axes)
     
     def call(self, inputs):
         """
@@ -348,8 +347,8 @@ class BaseSpectralConv(Layer):
                 x_hat_real, x_hat_imag = self.rfft(inputs)  # shape = (None, ch_in, *dims), where dims = [nx // 2 + 1] for 1-D and [ny, nx // 2 + 1] for 2-D
 
                 # apply fft shift
-                x_hat_real = self.rfft_shift(x_hat_real)
-                x_hat_imag = self.rfft_shift(x_hat_imag)
+                x_hat_real = self.truncation_shift(x_hat_real)
+                x_hat_imag = self.truncation_shift(x_hat_imag)
 
                 # reduce to relevant modes
                 x_hat_real_truncated = x_hat_real[self.mode_truncation_slice]  # shape = (None, ch_in, *m)
@@ -367,8 +366,8 @@ class BaseSpectralConv(Layer):
                     y_hat_imag = ops.einsum(self.einsum_op_bias, y_hat_imag, self.bias)
 
                 # apply ifft shift
-                y_hat_real = self.rfft_shift(y_hat_real)
-                y_hat_imag = self.rfft_shift(y_hat_imag)
+                y_hat_real = self.truncation_shift(y_hat_real, inverse=True)
+                y_hat_imag = self.truncation_shift(y_hat_imag, inverse=True)
 
                 # reconstruct y via irfft
                 y = self.irfft((y_hat_real, y_hat_imag))  # shape = (None, *input_dims, ch_out)
@@ -396,8 +395,8 @@ class BaseSpectralConv(Layer):
                     dy_hat_real, dy_hat_imag = self.rfft(dy)
                     
                     # apply fft shift
-                    dy_hat_real = self.rfft_shift(dy_hat_real)
-                    dy_hat_imag = self.rfft_shift(dy_hat_imag)
+                    dy_hat_real = self.truncation_shift(dy_hat_real)
+                    dy_hat_imag = self.truncation_shift(dy_hat_imag)
 
                     # reduce to relevant modes, shape = (None, m, ch_out)
                     dy_hat_real_truncated = dy_hat_real[self.mode_truncation_slice]
@@ -420,8 +419,8 @@ class BaseSpectralConv(Layer):
                     dx_hat_imag = ops.pad(dx_hat_imag_truncated, pad_width=self.pad_width)
 
                     # apply ifft shift
-                    dx_hat_real = self.rfft_shift(dx_hat_real)
-                    dx_hat_imag = self.rfft_shift(dx_hat_imag)
+                    dx_hat_real = self.truncation_shift(dx_hat_real, inverse=True)
+                    dx_hat_imag = self.truncation_shift(dx_hat_imag, inverse=True)
 
                     # apply irfft, shape = (None, x, ch_in)
                     dx = self.irfft((dx_hat_real, dx_hat_imag))
@@ -453,8 +452,8 @@ class BaseSpectralConv(Layer):
             x_hat_real, x_hat_imag = self.rfft(inputs)
 
             # apply fft shift
-            x_hat_real = self.rfft_shift(x_hat_real)
-            x_hat_imag = self.rfft_shift(x_hat_imag)
+            x_hat_real = self.truncation_shift(x_hat_real)
+            x_hat_imag = self.truncation_shift(x_hat_imag)
 
             # reduce to relevant modes, shape = (None, mx, my, ch_in)
             x_hat_real_reduced = x_hat_real[self.mode_truncation_slice]  # 1D: (batch, m, ch_out), 2D: (batch, mx, my, ch_in)
@@ -472,8 +471,8 @@ class BaseSpectralConv(Layer):
                 y_hat_imag = ops.einsum(self.einsum_op_bias, y_hat_imag, self.bias)
 
             # apply ifft shift
-            y_hat_real = self.rfft_shift(y_hat_real)
-            y_hat_imag = self.rfft_shift(y_hat_imag)
+            y_hat_real = self.truncation_shift(y_hat_real, inverse=True)
+            y_hat_imag = self.truncation_shift(y_hat_imag, inverse=True)
 
             # reconstruct y via irfft, shape = (None, x, y, ch_out)
             y = self.irfft((y_hat_real, y_hat_imag))
