@@ -30,8 +30,8 @@ class BaseFCN(models.Model, _IterableVars):
         Decoder blocks will mirror the `strides` of the encoder blocks.
         Defaults to 1.
     padding : str, optional
-        Strides for encoder blocks. 
-        Decoder blocks will mirror the `strides` of the encoder blocks.
+        Padding for encoder blocks. 
+        Decoder blocks will mirror the `padding` of the encoder blocks.
         If `rank=1`, `padding` may be either `"same"` or `"causal"`, `rank>1` enforces `padding="same"`
         to maintain deterministic shapes throughout the model.
         Defaults to `"same"`.
