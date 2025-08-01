@@ -365,8 +365,8 @@ class BaseSpectralConv(Layer):
                 x_real_truncated = x_real[self.mode_truncation_slice]  # shape = (None, ch_in, *m)
                 x_imag_truncated = x_imag[self.mode_truncation_slice]  # shape = (None, ch_in, *m)
 
-                y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)
-                y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)
+                y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)
+                y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)
 
                 y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)  # shape = (None, ch_out, *n)
                 y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)  # shape = (None, ch_out, *n)
@@ -471,8 +471,8 @@ class BaseSpectralConv(Layer):
             x_real_truncated = x_real[self.mode_truncation_slice]  # 1D: (batch, m, ch_out), 2D: (batch, mx, my, ch_in)
             x_imag_truncated = x_imag[self.mode_truncation_slice]  # 1D: (batch, m, ch_out), 2D: (batch, mx, my, ch_in)
 
-            y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)
-            y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)
+            y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)
+            y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)
 
             y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)
             y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)
