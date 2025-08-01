@@ -46,11 +46,11 @@ class TSMixer(models.Model, _IterableVars):
     The following code creates a TSMixer model with three residual blocks.
     >>> from keras import ops
     >>> x = ops.ones((1, 256, 32))  # time series of length 256 with 32 features
-    >>> model = TSMixer(sequence_length=128, num_hidden=[None, 32, 16])
+    >>> model = TSMixer(sequence_length=512, num_hidden=[None, 32, 16])
     >>> model.build(input_shape=x.shape)
     >>> y = model(x)
     >>> y.shape
-    TensorShape([1, 128, 32])
+    TensorShape([1, 512, 32])
 
     """
 
@@ -83,13 +83,13 @@ class TSMixer(models.Model, _IterableVars):
                 self.norm,
                 self.dropout_rate
             )
-        ])
+        ], name="tsmixer_blocks")
 
         self.output_section = models.Sequential([
             layers.Permute(dims=(2, 1), name="transpose_1"),
             layers.Dense(units=self.sequence_length, name="dense"),
             layers.Permute(dims=(2, 1), name="transpose_2")
-        ])
+        ], name="output_stage")
 
     def build(self, input_shape):
         if self.built:
@@ -106,6 +106,12 @@ class TSMixer(models.Model, _IterableVars):
         x = self.residual_blocks(inputs)
         x = self.output_section(x)
         return x
+    
+    def compute_output_shape(self, input_shape):
+        output_shape = self.residual_blocks.compute_output_shape(input_shape)
+        output_shape = self.output_section.compute_output_shape(output_shape)
+
+        return output_shape
     
     def get_config(self):
         config = super().get_config()
@@ -124,4 +130,50 @@ class TSMixer(models.Model, _IterableVars):
         config.update({"activation": saving.deserialize_keras_object(activation_cfg)})
 
         return cls(**config)
+    
+    def summary(self, *args, **kwargs):
+        """
+        Prints the summary of the model.
+
+        Here `super().summary()` is called with `expand_nested=True`
+
+        Parameters
+        ----------
+        line_length: int, optional
+            Total length of printed lines
+            (e.g. set this to adapt the display to different
+            terminal window sizes).
+        positions: list, optional
+            Relative or absolute positions of log elements
+            in each line. If not provided, becomes
+            `[0.3, 0.6, 0.70, 1.]`. Defaults to `None`.
+        print_fn: callable, optional
+            Print function to use. By default, prints to `stdout`.
+            If `stdout` doesn't work in your environment, change to `print`.
+            It will be called on each line of the summary.
+            You can set it to a custom function
+            in order to capture the string summary.
+        show_trainable: bool, optional
+            Whether to show if a layer is trainable.
+            Defaults to `False`.
+        layer_range: list | tuple, optional
+            a list or tuple of 2 strings,
+            which is the starting layer name and ending layer name
+            (both inclusive) indicating the range of layers to be printed
+            in summary. It also accepts regex patterns instead of exact
+            names. In this case, the start predicate will be
+            the first element that matches `layer_range[0]`
+            and the end predicate will be the last element
+            that matches `layer_range[1]`.
+            By default `None` considers all layers of the model.
+
+        Raises
+        ------
+        ValueError
+            If `summary()` is called before the model is built.
+        
+        """
+
+        kwargs.pop("expand_nested", None)
+        return super().summary(expand_nested=True, *args, **kwargs)
     

@@ -140,6 +140,17 @@ class TSMixerBlock(layers.Layer):
 
         return x + res
     
+    def compute_output_shape(self, input_shape):
+        forward_shape = self.temporal_norm.compute_output_shape(input_shape=input_shape)
+        forward_shape = self.transpose_1.compute_output_shape(input_shape=forward_shape)
+        forward_shape = self.temporal_dense.compute_output_shape(input_shape=forward_shape)
+        forward_shape = self.transpose_2.compute_output_shape(input_shape=forward_shape)
+        forward_shape = self.feature_norm.compute_output_shape(input_shape=forward_shape)
+        forward_shape = self.feature_dense_1.compute_output_shape(input_shape=forward_shape)
+        forward_shape = self.feature_dense_2.compute_output_shape(input_shape=forward_shape)
+
+        return forward_shape
+    
     def get_config(self):
         config = super().get_config()
         config.update({
