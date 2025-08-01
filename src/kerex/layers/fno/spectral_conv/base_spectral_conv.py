@@ -415,7 +415,7 @@ class BaseSpectralConv(Layer):
 
                     # compute gradients for weights, shape = (ch_in, m, ch_out)
                     dw_real = ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_real_truncated) + ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_imag_truncated)
-                    dw_imag = ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_real_truncated) - ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_imag_truncated)  # NOTE wrong way aroung?
+                    dw_imag = ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_real_truncated) - ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_imag_truncated)
 
                     if self.use_bias:
                         # compute gradients for bias, shape = (ch_out, )
@@ -436,10 +436,13 @@ class BaseSpectralConv(Layer):
 
                     # apply irfft, shape = (None, x, ch_in)
                     dx = self.irfft((dx_real, dx_imag))
-                    if self.use_bias:
-                        return dx, [db_real, db_imag, dw_real, dw_imag]
                     
-                    return dx, [dw_real, dw_imag]
+                    if self.use_bias:
+                        grads = [db_real, db_imag, dw_real, dw_imag]
+                    else:
+                        grads = [dw_real, dw_imag]
+                    
+                    return dx, grads
 
                 return y, backprop
                 
