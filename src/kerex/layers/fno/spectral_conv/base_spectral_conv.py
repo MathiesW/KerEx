@@ -355,33 +355,36 @@ class BaseSpectralConv(Layer):
                     
                 """
                 
-                x_real, x_imag = self.rfft(inputs)  # shape = (None, ch_in, *dims), where dims = [nx // 2 + 1] for 1-D and [ny, nx // 2 + 1] for 2-D
+                # forward pass, input shape = (None, *x, ch_in)
+                x_real, x_imag = self.rfft(inputs)  # (None, ch_in, *x)
 
                 # apply fft shift
-                x_real = self.truncation_shift(x_real)
-                x_imag = self.truncation_shift(x_imag)
+                x_real = self.truncation_shift(x_real)  # (None, ch_in, *x)
+                x_imag = self.truncation_shift(x_imag)  # (None, ch_in, *x)
 
                 # reduce to relevant modes
-                x_real_truncated = x_real[self.mode_truncation_slice]  # shape = (None, ch_in, *m)
-                x_imag_truncated = x_imag[self.mode_truncation_slice]  # shape = (None, ch_in, *m)
+                x_real_truncated = x_real[self.mode_truncation_slice]  # (None, ch_in, *m)
+                x_imag_truncated = x_imag[self.mode_truncation_slice]  # (None, ch_in, *m)
 
-                y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)
-                y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)
+                # apply weights
+                y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)  # (None, ch_out, *m)
+                y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)  # (None, ch_out, *m)
 
-                y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)  # shape = (None, ch_out, *n)
-                y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)  # shape = (None, ch_out, *n)
-
-                # add bias, shape = (None, ch_out, *m)
+                # add bias
                 if self.use_bias:
-                    y_real = ops.einsum(self.einsum_op_bias, y_real, self._real_bias)
-                    y_imag = ops.einsum(self.einsum_op_bias, y_imag, self._imag_bias)
+                    y_real_truncated = ops.einsum(self.einsum_op_bias, y_real_truncated, self._real_bias)  # (None, ch_out, *m)
+                    y_imag_truncated = ops.einsum(self.einsum_op_bias, y_imag_truncated, self._imag_bias)  # (None, ch_out, *m)
+
+                # pad to initial size
+                y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
+                y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
 
                 # apply ifft shift
-                y_real = self.truncation_shift(y_real, inverse=True)
-                y_imag = self.truncation_shift(y_imag, inverse=True)
+                y_real = self.truncation_shift(y_real, inverse=True)  # (None, ch_out, *x)
+                y_imag = self.truncation_shift(y_imag, inverse=True)  # (None, ch_out, *x)
 
                 # reconstruct y via irfft
-                y = self.irfft((y_real, y_imag))  # shape = (None, *input_dims, ch_out)
+                y = self.irfft((y_real, y_imag))  # (None, *x, ch_out)
 
                 def backprop(dy, variables=None):
                     """
@@ -402,40 +405,41 @@ class BaseSpectralConv(Layer):
                     
                     """
 
-                    # get real and imaginary part via rfft, shape = (None, x//2+1, ch_out)
-                    dy_real, dy_imag = self.rfft(dy)
+                    # input shape (None, *x, ch_out)
+                    # get real and imaginary part via rfft
+                    dy_real, dy_imag = self.rfft(dy)  # (None, ch_out, *x)
                     
                     # apply fft shift
-                    dy_real = self.truncation_shift(dy_real)
-                    dy_imag = self.truncation_shift(dy_imag)
+                    dy_real = self.truncation_shift(dy_real)  # (None, ch_out, *x)
+                    dy_imag = self.truncation_shift(dy_imag)  # (None, ch_out, *x)
 
-                    # reduce to relevant modes, shape = (None, m, ch_out)
-                    dy_real_truncated = dy_real[self.mode_truncation_slice]
-                    dy_imag_truncated = dy_imag[self.mode_truncation_slice]
+                    # reduce to relevant modes
+                    dy_real_truncated = dy_real[self.mode_truncation_slice]  # (None, ch_out, *m)
+                    dy_imag_truncated = dy_imag[self.mode_truncation_slice]  # (None, ch_out, *m)
 
-                    # compute gradients for weights, shape = (ch_in, m, ch_out)
-                    dw_real = ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_real_truncated) + ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_imag_truncated)
-                    dw_imag = ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_real_truncated) - ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_imag_truncated)
+                    # compute gradients for weights
+                    dw_real = ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_real_truncated) + ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_imag_truncated)  # (None, ch_out, *m)
+                    dw_imag = ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_real_truncated) - ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_imag_truncated)  # (None, ch_out, *m)
 
                     if self.use_bias:
-                        # compute gradients for bias, shape = (ch_out, )
-                        db_real = ops.einsum(self.einsum_op_backprop_bias, dy_real_truncated)
-                        db_imag = ops.einsum(self.einsum_op_backprop_bias, dy_imag_truncated)
+                        # compute gradients for bias
+                        db_real = ops.einsum(self.einsum_op_backprop_bias, dy_real_truncated)  # (None, ch_out, *m)
+                        db_imag = ops.einsum(self.einsum_op_backprop_bias, dy_imag_truncated)  # (None, ch_out, *m)
 
-                    # compute gradient for inputs, shape = (None, m, ch_in)
-                    dx_real_truncated = ops.einsum(self.einsum_op_backprop_x, dy_real_truncated, self._real_kernel) + ops.einsum(self.einsum_op_backprop_x, dy_imag_truncated, self._imag_kernel)
-                    dx_imag_truncated = ops.einsum(self.einsum_op_backprop_x, dy_imag_truncated, self._real_kernel) - ops.einsum(self.einsum_op_backprop_x, dy_real_truncated, self._imag_kernel)
+                    # compute gradient for inputs
+                    dx_real_truncated = ops.einsum(self.einsum_op_backprop_x, dy_real_truncated, self._real_kernel) + ops.einsum(self.einsum_op_backprop_x, dy_imag_truncated, self._imag_kernel)  # (None, ch_in, *m)
+                    dx_imag_truncated = ops.einsum(self.einsum_op_backprop_x, dy_imag_truncated, self._real_kernel) - ops.einsum(self.einsum_op_backprop_x, dy_real_truncated, self._imag_kernel)  # (None, ch_in, *m)
 
-                    # pad for ifft, shape = (None, x, ch_in)
-                    dx_real = ops.pad(dx_real_truncated, pad_width=self.pad_width)
-                    dx_imag = ops.pad(dx_imag_truncated, pad_width=self.pad_width)
+                    # pad to initial size
+                    dx_real = ops.pad(dx_real_truncated, pad_width=self.pad_width)  # (None, ch_in, *x)
+                    dx_imag = ops.pad(dx_imag_truncated, pad_width=self.pad_width)  # (None, ch_in, *x)
 
                     # apply ifft shift
-                    dx_real = self.truncation_shift(dx_real, inverse=True)
-                    dx_imag = self.truncation_shift(dx_imag, inverse=True)
+                    dx_real = self.truncation_shift(dx_real, inverse=True)  # (None, ch_in, *x)
+                    dx_imag = self.truncation_shift(dx_imag, inverse=True)  # (None, ch_in, *x)
 
-                    # apply irfft, shape = (None, x, ch_in)
-                    dx = self.irfft((dx_real, dx_imag))
+                    # apply irfft
+                    dx = self.irfft((dx_real, dx_imag))  # (None, *x, ch_in)
                     
                     if self.use_bias:
                         grads = [db_real, db_imag, dw_real, dw_imag]
@@ -463,34 +467,36 @@ class BaseSpectralConv(Layer):
 
             """
 
-            # forward pass, shape = (None, x, y, ch_in)
-            x_real, x_imag = self.rfft(inputs)
+            # forward pass, input shape = (None, *x, ch_in)
+            x_real, x_imag = self.rfft(inputs)  # (None, ch_in, *x)
 
             # apply fft shift
-            x_real = self.truncation_shift(x_real)
-            x_imag = self.truncation_shift(x_imag)
+            x_real = self.truncation_shift(x_real)  # (None, ch_in, *x)
+            x_imag = self.truncation_shift(x_imag)  # (None, ch_in, *x)
 
-            # reduce to relevant modes, shape = (None, mx, my, ch_in)
-            x_real_truncated = x_real[self.mode_truncation_slice]  # 1D: (batch, m, ch_out), 2D: (batch, mx, my, ch_in)
-            x_imag_truncated = x_imag[self.mode_truncation_slice]  # 1D: (batch, m, ch_out), 2D: (batch, mx, my, ch_in)
+            # reduce to relevant modes
+            x_real_truncated = x_real[self.mode_truncation_slice]  # (None, ch_in, *m)
+            x_imag_truncated = x_imag[self.mode_truncation_slice]  # (None, ch_in, *m)
 
-            y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)
-            y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)
+            # apply weights
+            y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)  # (None, ch_out, *m)
+            y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)  # (None, ch_out, *m)
 
-            y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)
-            y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)
-
-            # add bias, shape = (None, mx, my, ch_out)
+            # add bias
             if self.use_bias:
-                y_real = ops.einsum(self.einsum_op_bias, y_real, self._real_bias)
-                y_imag = ops.einsum(self.einsum_op_bias, y_imag, self._imag_bias)
+                y_real_truncated = ops.einsum(self.einsum_op_bias, y_real_truncated, self._real_bias)  # (None, ch_out, *m)
+                y_imag_truncated = ops.einsum(self.einsum_op_bias, y_imag_truncated, self._imag_bias)  # (None, ch_out, *m)
+
+            # pad to initial size
+            y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
+            y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
 
             # apply ifft shift
-            y_real = self.truncation_shift(y_real, inverse=True)
-            y_imag = self.truncation_shift(y_imag, inverse=True)
+            y_real = self.truncation_shift(y_real, inverse=True)  # (None, ch_out, *x)
+            y_imag = self.truncation_shift(y_imag, inverse=True)  # (None, ch_out, *x)
 
-            # reconstruct y via irfft, shape = (None, x, y, ch_out)
-            y = self.irfft((y_real, y_imag))
+            # reconstruct y via irfft
+            y = self.irfft((y_real, y_imag))  # (None, *x, ch_out)
 
             return y
 
