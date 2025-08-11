@@ -1,7 +1,11 @@
 from keras import layers
 from keras import ops
 from keras import saving
-from keras import Sequential
+from keras.src.models import Sequential
+from keras.src.models import Functional
+from keras.src.layers.convolutional.base_conv import BaseConv
+from keras.src.layers.convolutional.base_separable_conv import BaseSeparableConv
+from keras.src.layers.convolutional.base_conv_transpose import BaseConvTranspose
 
 
 @saving.register_keras_serializable(package="CustomWrapper", name="TemporalSlice")
@@ -67,9 +71,22 @@ class TemporalSlice(layers.Wrapper):
         # inherit data format from wrapped layer
         try:
             self.data_format = self.layer.data_format
+            self.is_convolutional = True
         except AttributeError:
-            # make an educated guess regarding the data format
-            self.data_format = "channels_last"
+            if isinstance(self.layer, Sequential):
+                layers = self.layer.layers
+            elif not isinstance(self.layer, Functional):
+                # We treat subclassed models as a simple sequence of layers, for logging
+                # purposes.
+                layers = self.layer.layers
+
+            conv_layers = [isinstance(type(l), (BaseConv, BaseConvTranspose, BaseSeparableConv)) for l in layers]
+            if any(conv_layers):
+                self.is_convolutional = True
+                self.data_format = layers[conv_layers.index(True)].data_format
+            else:
+                self.is_convolutional = False
+                self.data_format = "channels_last"  # make an educated guess regarding the data format
 
         # set axis for temporal slice. defaults to the channel axis / -1
         self.axis = axis or -1 if self.data_format == "channels_last" else 1
@@ -102,10 +119,11 @@ class TemporalSlice(layers.Wrapper):
         # update input shape
         input_slice = [None, *[input_shape[item] for item in feature_axes]]
 
-        if self.axis == -1:
-            input_slice.append(self.window_size)
-        else:
-            input_slice.insert(self.axis, self.window_size)
+        if self.is_convolutional:
+            if self.axis == -1:
+                input_slice.append(self.window_size)
+            else:
+                input_slice.insert(self.axis, self.window_size)
 
         input_slice = tuple(input_slice)
 
@@ -124,31 +142,32 @@ class TemporalSlice(layers.Wrapper):
         to then stack the last two axes with a reshape layer
         """
         # define transpose axes
-        transpose_axes = list(range(1, len(input_shape) + 1))
+        transpose_axes = list(range(1, len(input_shape) + 1 if self.is_convolutional else len(input_shape)))
 
         # first, move first axis (0) after the original channel axis
         if self.axis == -1:
             transpose_axes.append(0)
         else:
-            transpose_axes.insert(self.axis + 1, 0)
+            transpose_axes.insert(self.axis + 1 if self.is_convolutional else self.axis, 0)
 
         self.transpose_axes = transpose_axes
 
         """ define reshape op
         we have to merge the channel axes
         """
-        output_shape = self.layer.compute_output_shape(input_shape=input_slice)
+        if self.is_convolutional:
+            output_shape = self.layer.compute_output_shape(input_shape=input_slice)
 
-        # remove batch dimension from output shape
-        output_shape = list(output_shape)
-        output_shape.pop(0)
+            # remove batch dimension from output shape
+            output_shape = list(output_shape)
+            output_shape.pop(0)
 
-        target_shape = [1] * len(output_shape)
-        target_shape[self.axis] = self.num_windows
+            target_shape = [1] * len(output_shape)
+            target_shape[self.axis] = self.num_windows
 
-        self.target_shape = tuple([int(ts * os) for ts, os in zip(output_shape, target_shape)])
+            self.target_shape = tuple([int(ts * os) for ts, os in zip(output_shape, target_shape)])
 
-        self.reshape = layers.Reshape(target_shape=self.target_shape)
+            self.reshape = layers.Reshape(target_shape=self.target_shape)
 
         self.built = True
 
@@ -177,7 +196,10 @@ class TemporalSlice(layers.Wrapper):
 
         # combine first and last dimension somehow. we need to stack them ideally
         x = ops.transpose(x, axes=self.transpose_axes)
-        return self.reshape(x)
+        if self.is_convolutional:
+            x = self.reshape(x)
+
+        return x
     
     def get_config(self):
         """
