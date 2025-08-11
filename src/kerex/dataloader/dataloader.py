@@ -53,6 +53,8 @@ class TFRecordsHandlerBase:
             except FileNotFoundError:
                 pass
 
+        self.valid_dtype = (np.number, np.ndarray)
+
     def setup(self, **kwargs):
         """
         Initialize dimensions dictionary by passing all features to the setup
@@ -87,7 +89,7 @@ class TFRecordsHandlerBase:
 
         """
 
-        if all(isinstance(v, np.ndarray) for v in kwargs.values()):
+        if all(isinstance(v, self.valid_dtype) for v in kwargs.values()):
             self.metadata = {
                 k: {
                     "dtype": str(v.dtype),
@@ -259,7 +261,7 @@ class TFRecordsHandlerBase:
             dimensions = {f"{k}_{s}": tf.io.FixedLenFeature([], tf.int64) for k in self.metadata.keys() for s in self.metadata[k]["shape_names"]}
             return {**features, **dimensions}
 
-        if all(isinstance(v, np.ndarray) for v in kwargs.values()):
+        if all(isinstance(v, self.valid_dtype) for v in kwargs.values()):
             # """
             # Example usage
             #     >>> serialized_feature = dict(feature_name=self._bytes_feature(tf.io.serialize_tensor(feature)))
