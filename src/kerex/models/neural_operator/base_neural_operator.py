@@ -11,8 +11,8 @@ class BaseNeuralOperator(models.Model, _IterableVars):
 
     Parameters
     ----------
-    rank : int {1, 2}
-        Rank of `BaseNeuralOperator`. Must be within {1, 2}.
+    rank : int {1, 2, 3}
+        Rank of `BaseNeuralOperator`. Must be within {1, 2, 3}.
     filters : int | list | tuple
         Number of filters for the sequential FNO layers.
         If this is a list/tuple, the length of this argument determines the number of FNO layers.
