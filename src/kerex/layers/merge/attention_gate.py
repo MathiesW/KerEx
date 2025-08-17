@@ -33,7 +33,7 @@ class AttentionGate(Merge):
 
     """
 
-    def __init__(self, data_format="channels_last", merge_layer="concatenate", **kwargs):
+    def __init__(self, data_format="channels_last", merge_layer="add", **kwargs):
         super().__init__(**kwargs)
         self.data_format = data_format
         self.axis = -1 if self.data_format == "channels_last" else 1
@@ -50,6 +50,7 @@ class AttentionGate(Merge):
             )
 
         self.relu = layers.ReLU()
+        self.gate = layers.Multiply()
 
     def build(self, input_shape):
         """
@@ -99,14 +100,14 @@ class AttentionGate(Merge):
         channels_x = shape_x[self.axis]
         channels_g = shape_g[self.axis]
 
-        channels = min(channels_x, channels_g)
+        # channels = min(channels_x, channels_g)
 
         conv_kwargs = dict(kernel_size=1, padding="same", data_format=self.data_format)
 
         # get layers
-        self.conv_x = get_layer(f"Conv{dim - 2}D", filters=channels, **conv_kwargs)
-        self.conv_g = get_layer(f"Conv{dim - 2}D", filters=channels, **conv_kwargs)
-        self.psi = get_layer(f"Conv{dim - 2}D", filters=1, activation="sigmoid", **conv_kwargs)
+        self.conv_x = get_layer(f"Conv{dim - 2}D", filters=channels_g, **conv_kwargs)
+        self.conv_g = get_layer(f"Conv{dim - 2}D", filters=channels_g, **conv_kwargs)
+        self.psi = get_layer(f"Conv{dim - 2}D", filters=channels_x, activation="sigmoid", **conv_kwargs)
 
         # build layers in forward fashion
         self.conv_x.build(input_shape=shape_x)
@@ -114,11 +115,18 @@ class AttentionGate(Merge):
 
         shape_x_forward = self.conv_x.compute_output_shape(input_shape=shape_x)
         shape_g = self.conv_g.compute_output_shape(input_shape=shape_g)
-        
-        self.psi.build(input_shape=shape_x_forward)
-        shape_psi = self.psi.compute_output_shape(input_shape=shape_x_forward)
 
-        self.merge_layer.build(input_shape=[shape_x, shape_psi])  # NOTE this will throw an exception if shapes don't match, so I don't have to implement it myself :-)
+        self.merge_layer.build(input_shape=[shape_x_forward, shape_g])  # NOTE this will throw an exception if shapes don't match, so I don't have to implement it myself :-)
+        forward_shape = self.merge_layer.compute_output_shape(input_shape=[shape_x_forward, shape_g])
+        
+        self.psi.build(input_shape=forward_shape)
+        shape_alpha = self.psi.compute_output_shape(input_shape=forward_shape)
+
+        # self.merge_layer.build(input_shape=[shape_x, shape_psi])  # NOTE this will throw an exception if shapes don't match, so I don't have to implement it myself :-)
+        assert shape_alpha == shape_x  # has to be given to apply gating mechanism
+
+        # build gate layer (just mutliplication)
+        self.gate.build(input_shape=[shape_x, shape_alpha])
 
         self.built = True
 
@@ -131,24 +139,24 @@ class AttentionGate(Merge):
         goal is to modulate the skip information, not the forward information,
         at the end, both information (the modulated skip information and the original forward information) are merged
         """
-        x_foward, x_skip = inputs
+        x_forward, x_skip = inputs
 
         # apply 1x1 convolutions to inputs
-        x_forward_projection = self.conv_x(x_foward)
+        x_forward_projection = self.conv_x(x_forward)
         x_skip_projection = self.conv_g(x_skip)
 
         # add inputs and apply relu activation
-        alpha = x_forward_projection + x_skip_projection
+        alpha = self.merge_layer((x_forward_projection, x_skip_projection))
         alpha = self.relu(alpha)
 
         # apply 1x1 convolution with sigmoid to get gating behavior
         alpha = self.psi(alpha)
 
         # apply gating mechanism to x
-        modulated_skip = x_skip * alpha  # NOTE shapes have to match exactly!
+        # modulated_skip = x_skip * alpha  # NOTE shapes have to match exactly!
         
         # finally apply the merge operation
-        return self.merge_layer([x_foward, modulated_skip])
+        return self.gate([x_forward, alpha])
     
     def get_config(self):
         """
@@ -208,8 +216,13 @@ class AttentionGate(Merge):
 
         """
 
-        shape_x, shape_g = input_shape
-        output_shape = self.merge_layer.compute_output_shape([shape_x, shape_g])
+        x_shape, g_shape = input_shape
+
+        # go through alpha branch 
+        alpha_shape = self.merge_layer.compute_output_shape(input_shape=[x_shape, g_shape])
+        alpha_shape = self.psi.compute_output_shape(input_shape=alpha_shape)
+        
+        output_shape = self.gate.compute_output_shape(input_shape=[x_shape, alpha_shape])
 
         return output_shape
         
