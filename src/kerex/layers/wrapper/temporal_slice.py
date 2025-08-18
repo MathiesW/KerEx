@@ -6,6 +6,7 @@ from keras.src.models import Functional
 from keras.src.layers.convolutional.base_conv import BaseConv
 from keras.src.layers.convolutional.base_separable_conv import BaseSeparableConv
 from keras.src.layers.convolutional.base_conv_transpose import BaseConvTranspose
+from keras.src.backend import standardize_data_format
 
 
 @saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="TemporalSlice")
@@ -74,16 +75,16 @@ class TemporalSlice(layers.Wrapper):
             self.is_convolutional = True
         except AttributeError:
             if isinstance(self.layer, Sequential):
-                layers = self.layer.layers
+                seq_layers = self.layer.layers
             elif not isinstance(self.layer, Functional):
                 # We treat subclassed models as a simple sequence of layers, for logging
                 # purposes.
-                layers = self.layer.layers
+                seq_layers = self.layer.layers
 
-            conv_layers = [isinstance(type(l), (BaseConv, BaseConvTranspose, BaseSeparableConv)) for l in layers]
+            conv_layers = [isinstance(type(l), (BaseConv, BaseConvTranspose, BaseSeparableConv)) for l in seq_layers]
             if any(conv_layers):
                 self.is_convolutional = True
-                self.data_format = layers[conv_layers.index(True)].data_format
+                self.data_format = seq_layers[conv_layers.index(True)].data_format
             else:
                 self.is_convolutional = False
                 self.data_format = "channels_last"  # make an educated guess regarding the data format
@@ -119,11 +120,11 @@ class TemporalSlice(layers.Wrapper):
         # update input shape
         input_slice = [None, *[input_shape[item] for item in feature_axes]]
 
-        if self.is_convolutional:
-            if self.axis == -1:
-                input_slice.append(self.window_size)
-            else:
-                input_slice.insert(self.axis, self.window_size)
+        # if self.is_convolutional:
+        if self.axis == -1:
+            input_slice.append(self.window_size)
+        else:
+            input_slice.insert(self.axis, self.window_size)
 
         input_slice = tuple(input_slice)
 
@@ -155,19 +156,19 @@ class TemporalSlice(layers.Wrapper):
         """ define reshape op
         we have to merge the channel axes
         """
-        if self.is_convolutional:
-            output_shape = self.layer.compute_output_shape(input_shape=input_slice)
+        # if self.is_convolutional:
+        output_shape = self.layer.compute_output_shape(input_shape=input_slice)
 
-            # remove batch dimension from output shape
-            output_shape = list(output_shape)
-            output_shape.pop(0)
+        # remove batch dimension from output shape
+        output_shape = list(output_shape)
+        output_shape.pop(0)
 
-            target_shape = [1] * len(output_shape)
-            target_shape[self.axis] = self.num_windows
+        target_shape = [1] * len(output_shape)
+        target_shape[self.axis] = self.num_windows
 
-            self.target_shape = tuple([int(ts * os) for ts, os in zip(output_shape, target_shape)])
+        self.target_shape = tuple([int(ts * os) for ts, os in zip(output_shape, target_shape)])
 
-            self.reshape = layers.Reshape(target_shape=self.target_shape)
+        self.reshape = layers.Reshape(target_shape=self.target_shape)
 
         self.built = True
 
@@ -264,3 +265,75 @@ class TemporalSlice(layers.Wrapper):
         b = input_shape.pop(0)
         output_shape = (b, *self.target_shape)
         return output_shape
+
+
+class TemporalSliceV2(layers.Wrapper):
+    """
+    call model on windows along an axis of the data
+
+    e.g. 
+    input_shape = (1, 16, 32, 32, 3)
+    model_input_shape = (1, 4, 32, 32, 3)
+    model_output_shape = (1, 1, 32, 32, 3)
+    --> call model 13 times along first axis of input and stacks the output along the same axis
+    --> TemporalSliceV2(model): (1, 16, 32, 32, 3) -> (1, 13, 32, 32, 3)
+
+    It is assumed, that the wrapper layer or model is convolutional
+
+    """
+
+    def __init__(self, layer, window_size, strides=1, axis=None, data_format=None, name="temporal_slice", **kwargs):
+        name = f"{name}({layer.name})"
+        super().__init__(layer=layer, name=name, **kwargs)
+
+        # remove reshape layer from any `Sequential` model
+        if isinstance(self.layer, Sequential):
+            is_reshape_layer = [issubclass(type(layer), layers.Reshape) for layer in self.layer.layers]
+            if any(is_reshape_layer):
+                if (sum(is_reshape_layer) == 1) and (is_reshape_layer.index(True) + 1 == len(is_reshape_layer)):
+                    # there is only a single reshape layer and it is the last layer in the Sequential model. we can simply remove it
+                    model_layers: list = self.layer.layers
+                    model_layers.pop(-1)
+                    self.layer = Sequential(model_layers)
+                else:
+                    raise RuntimeError(f"Wrapped model has reshape layers. Please remove those before wrapping model.")
+
+        self.data_format = standardize_data_format(data_format)  # defaults to `"channels_last"`
+
+        # set axis for temporal slice. defaults to the channel axis / -1
+        self.axis = axis or -1 if self.data_format == "channels_last" else 1
+
+        # sliding window parameters
+        self.window_size = window_size
+        self.strides = strides
+        self.num_windows = None  # is set in build method, since it depends on the input shape!
+
+        self.transpose_axes = None  # is set in build method, too
+
+    def build(self, input_shape):
+        if self.built:
+            return
+        
+        # get feature axes, i.e., axes that remain untouched for input shape for a single wrapped instance
+        feature_axes = list(range(len(input_shape)))
+        feature_axes.pop(0)  # remove batch
+        feature_axes.pop(self.axis)  # remove axis we operate on
+
+        # update input shape
+        input_slice = [None, *[input_shape[item] for item in feature_axes]]
+
+        if self.axis == -1:
+            input_slice.append(self.window_size)
+        else:
+            input_slice.insert(self.axis, self.window_size)
+
+        input_slice = tuple(input_slice)
+
+        # build super()
+        super().build(input_shape=input_slice)
+
+        # define input_spec
+        channel_axis = input_shape[self.axis]
+        input_time_steps = input_shape[self.axis]
+
+        self.input_spec = layers.InputSpec(ndim=len(input_slice) - 2, axes={channel_axis: input_time_steps})
