@@ -8,7 +8,7 @@ from keras.src.layers.convolutional.base_separable_conv import BaseSeparableConv
 from keras.src.layers.convolutional.base_conv_transpose import BaseConvTranspose
 
 
-@saving.register_keras_serializable(package="CustomWrapper", name="TemporalSlice")
+@saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="TemporalSlice")
 class TemporalSlice(layers.Wrapper):
     """
     Temporal slice wrapper

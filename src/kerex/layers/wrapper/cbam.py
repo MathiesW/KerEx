@@ -9,7 +9,7 @@ from keras.src import activations
 from ...ops import get_layer
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layer", name="ChannelAttentionModule")
+@saving.register_keras_serializable(package="Kerex.Layers", name="ChannelAttentionModule")
 class ChannelAttentionModule(layers.Layer):
     """
     Convolutional Channel Attention Module (CAM)
@@ -167,7 +167,7 @@ class ChannelAttentionModule(layers.Layer):
         return config
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layer", name="SpatialAttentionModule")
+@saving.register_keras_serializable(package="Kerex.Layers", name="SpatialAttentionModule")
 class SpatialAttentionModule(layers.Layer):
     """
     Spatial Attention Module (SAM)
@@ -303,7 +303,7 @@ class SpatialAttentionModule(layers.Layer):
         return config
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layer.Wrapper", name="CBAM")
+@saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="CBAM")
 class CBAM(layers.Wrapper):
     """
     Convolutional Block Attention Module Wrapper

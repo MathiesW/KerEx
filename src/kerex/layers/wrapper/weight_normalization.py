@@ -3,7 +3,7 @@ from keras import ops
 from keras import saving
 
 
-@saving.register_keras_serializable(package='CustomWrapper', name='WeightNormalization')
+@saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="WeightNormalization")
 class WeightNormalization(layers.Wrapper):
     """
     Weight Normalization wrapper for any Keras `layer`.

@@ -2,7 +2,7 @@ from keras import saving
 from .base_models import BaseFCN
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="FCN1D")
+@saving.register_keras_serializable(package="Kerex.Models.AutoEncoder", name="FCN1D")
 class FCN1D(BaseFCN):
     """
     1-D implementation of Fully Convolutional Network (FCN)
@@ -145,7 +145,7 @@ class FCN1D(BaseFCN):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="FCN2D")
+@saving.register_keras_serializable(package="Kerex.Models.AutoEncoder", name="FCN2D")
 class FCN2D(BaseFCN):
     """
     2-D implementation of Fully Convolutional Network (FCN)
@@ -283,7 +283,7 @@ class FCN2D(BaseFCN):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="FCN3D")
+@saving.register_keras_serializable(package="Kerex.Models.AutoEncoder", name="FCN3D")
 class FCN3D(BaseFCN):
     """
     3-D implementation of Fully Convolutional Network (FCN)

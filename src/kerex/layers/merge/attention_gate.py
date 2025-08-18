@@ -5,7 +5,7 @@ from keras import saving
 from ...ops import get_layer
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layer.Merge", name="AttentionGate")
+@saving.register_keras_serializable(package="Kerex.Layers.Merge", name="AttentionGate")
 class AttentionGate(Merge):
     """
     Attention gate for expressive and expensive merging of two tensors

@@ -4,7 +4,7 @@ from keras.src.layers.merging.base_merge import Merge
 from ...ops import get_layer
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layer.Wrapper", name="Residual")
+@saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="Residual")
 class Residual(layers.Wrapper):
     """
     Residual Wrapper

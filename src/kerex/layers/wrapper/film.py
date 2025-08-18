@@ -5,7 +5,7 @@ from keras import saving
 from keras import ops
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layer.Wrapper", name="FiLM")
+@saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="FiLM")
 class FiLM(layers.Wrapper):
     """
     Feature-wise Linear Modulation Wrapper

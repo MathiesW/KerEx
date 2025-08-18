@@ -6,7 +6,7 @@ from typing import Tuple
 from ...blocks.attention import GlobalSelfAttention
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layers.Wrapper", name="SpatialAttention")
+@saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="SpatialAttention")
 class SpatialAttention(layers.Wrapper):
     """
     Applies spatial multi-head attention on the wrapped layer.
@@ -200,7 +200,7 @@ class SpatialAttention(layers.Wrapper):
         return self.layer.compute_output_shape(input_shape)
     
 
-@saving.register_keras_serializable(package="KerasAddon.Layers.Wrapper", name="ChannelAttention")
+@saving.register_keras_serializable(package="Kerex.Layers.Wrapper", name="ChannelAttention")
 class ChannelAttention(SpatialAttention):
     """
     Applies channel-wise multi-head attention on the wrapped layer.

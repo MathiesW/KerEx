@@ -79,6 +79,9 @@ class BaseFNO(layers.Layer):
             return
         
         self.forward.build(input_shape=input_shape)
+
+        # inherit input spec from `spectral_conv` layer
+        self.input_spec = self.forward.layer.input_spec
         
         self.built = True
 

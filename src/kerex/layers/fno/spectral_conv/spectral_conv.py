@@ -2,7 +2,7 @@ from keras import saving
 from .base_spectral_conv import BaseSpectralConv
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layers.FNO", name="SpectralConv1D")
+@saving.register_keras_serializable(package="Kerex.Layers.FNO", name="SpectralConv1D")
 class SpectralConv1D(BaseSpectralConv):
     def __init__(
         self,
@@ -36,7 +36,7 @@ class SpectralConv1D(BaseSpectralConv):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layers.FNO", name="SpectralConv2D")
+@saving.register_keras_serializable(package="Kerex.Layers.FNO", name="SpectralConv2D")
 class SpectralConv2D(BaseSpectralConv):
     def __init__(
         self,
@@ -70,7 +70,7 @@ class SpectralConv2D(BaseSpectralConv):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layers.FNO", name="SpectralConv3D")
+@saving.register_keras_serializable(package="Kerex.Layers.FNO", name="SpectralConv3D")
 class SpectralConv3D(BaseSpectralConv):
     def __init__(
         self,

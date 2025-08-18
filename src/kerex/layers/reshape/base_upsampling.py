@@ -3,7 +3,7 @@ from ...ops import get_layer
 from importlib import import_module
 
 
-class BaseUpsampling(layers.Layer):
+class BaseSmoothUpSampling(layers.Layer):
     def __init__(
         self, 
         rank,
@@ -55,6 +55,11 @@ class BaseUpsampling(layers.Layer):
         if self.built:
             return
         
+        # define input spec
+        channel_axis = len(input_shape) if self.data_format == "channels_last" else 1
+        input_channel = input_shape[channel_axis]
+        self.input_spec = layers.InputSpec(ndim=self.rank + 2, axes={channel_axis: input_channel})
+
         # build upsampling layer
         self.upsampling.build(input_shape)
         input_shape = self.upsampling.compute_output_shape(input_shape=input_shape)

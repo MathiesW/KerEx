@@ -4,7 +4,7 @@ from keras.src import ops
 from keras import saving
 
 
-@saving.register_keras_serializable(package="KerasAddon.Optimizers", name="AdamW")
+@saving.register_keras_serializable(package="Kerex.Optimizers", name="AdamW")
 class AdamW(optimizers.Adam):
     """
     Optimizer that implements the AdamW algorithm.

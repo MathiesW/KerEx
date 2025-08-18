@@ -5,7 +5,7 @@ from ...blocks.tsmixer import TSMixerBlock
 from ...ops.helper import _IterableVars
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models", name="TSMixer")
+@saving.register_keras_serializable(package="Kerex.Models", name="TSMixer")
 class TSMixer(models.Model, _IterableVars):
     """
     TSMixer model, cf. [Chen et al.](https://doi.org/10.48550/arXiv.2303.06053)

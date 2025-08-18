@@ -2,7 +2,7 @@ from keras import saving
 from .base_neural_operator import BaseNeuralOperator
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.NeuralOperator", name="NeuralOperator1D")
+@saving.register_keras_serializable(package="Kerex.Models.NeuralOperator", name="NeuralOperator1D")
 class NeuralOperator1D(BaseNeuralOperator):
     """
     NeuralOperator1D, cf. [Zongyi etl al.](https://doi.org/10.48550/arXiv.2010.08895)
@@ -101,7 +101,7 @@ class NeuralOperator1D(BaseNeuralOperator):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.NeuralOperator", name="NeuralOperator2D")
+@saving.register_keras_serializable(package="Kerex.Models.NeuralOperator", name="NeuralOperator2D")
 class NeuralOperator2D(BaseNeuralOperator):
     """
     NeuralOperator2D, cf. [Zongyi etl al.](https://doi.org/10.48550/arXiv.2010.08895)
@@ -203,7 +203,7 @@ class NeuralOperator2D(BaseNeuralOperator):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.NeuralOperator", name="NeuralOperator3D")
+@saving.register_keras_serializable(package="Kerex.Models.NeuralOperator", name="NeuralOperator3D")
 class NeuralOperator3D(BaseNeuralOperator):
     """
     NeuralOperator3D, cf. [Zongyi etl al.](https://doi.org/10.48550/arXiv.2010.08895)

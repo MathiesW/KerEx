@@ -2,7 +2,7 @@ from keras import saving
 from .base_models import BaseUnet
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="Unet1D")
+@saving.register_keras_serializable(package="Kerex.Models.AutoEncoder", name="Unet1D")
 class Unet1D(BaseUnet):
     """
     1-D implementation of Unet, cf. [Ronneberger et al.](https://arxiv.org/abs/1505.04597)
@@ -139,7 +139,7 @@ class Unet1D(BaseUnet):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="Unet2D")
+@saving.register_keras_serializable(package="Kerex.Models.AutoEncoder", name="Unet2D")
 class Unet2D(BaseUnet):
     """
     2-D implementation of Unet, cf. [Ronneberger et al.](https://arxiv.org/abs/1505.04597)
@@ -265,7 +265,7 @@ class Unet2D(BaseUnet):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Models.AutoEncoder", name="Unet3D")
+@saving.register_keras_serializable(package="Kerex.Models.AutoEncoder", name="Unet3D")
 class Unet3D(BaseUnet):
     """
     3-D implementation of Unet, cf. [Ronneberger et al.](https://arxiv.org/abs/1505.04597)
