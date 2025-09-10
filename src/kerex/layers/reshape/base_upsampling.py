@@ -1,5 +1,4 @@
 from keras import layers
-from ...ops import get_layer
 from importlib import import_module
 
 
@@ -56,7 +55,7 @@ class BaseSmoothUpSampling(layers.Layer):
             return
         
         # define input spec
-        channel_axis = len(input_shape) if self.data_format == "channels_last" else 1
+        channel_axis = len(input_shape) - 1 if self.conv.data_format == "channels_last" else 1
         input_channel = input_shape[channel_axis]
         self.input_spec = layers.InputSpec(ndim=self.rank + 2, axes={channel_axis: input_channel})
 
@@ -72,6 +71,12 @@ class BaseSmoothUpSampling(layers.Layer):
     def call(self, inputs):
         x = self.upsampling(inputs)
         return self.conv(x)
+    
+    def compute_output_shape(self, input_shape):
+        output_shape = self.upsampling.compute_output_shape(input_shape=input_shape)
+        output_shape = self.conv.compute_output_shape(input_shape=output_shape)
+
+        return output_shape
     
     def get_config(self):
         config = super().get_config()

@@ -27,6 +27,7 @@ class SmoothUpSampling1D(BaseSmoothUpSampling):
         name=None, 
         **kwargs
     ):
+        kwargs.pop("interpolation", None)
         super().__init__(
             rank=1,
             filters=filters,
@@ -130,6 +131,7 @@ class SmoothUpSampling3D(BaseSmoothUpSampling):
         name=None, 
         **kwargs
     ):
+        kwargs.pop("interpolation", None)
         super().__init__(
             rank=3,
             filters=filters,
