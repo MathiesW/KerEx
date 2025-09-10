@@ -6,6 +6,7 @@ from keras import constraints
 from keras import saving
 from ...ops.helper import _IterableVars
 from importlib import import_module
+from keras.src.backend import standardize_data_format
 
 
 class BaseEncoder(layers.Layer, _IterableVars):
@@ -114,7 +115,7 @@ class BaseEncoder(layers.Layer, _IterableVars):
         # set general class variables
         self.rank = rank
         self.padding = padding
-        self.data_format = data_format
+        self.data_format = standardize_data_format(data_format)
         self.activation = activation
         self.use_skip_connection = use_skip_connection
         self.use_bias = use_bias
@@ -285,9 +286,7 @@ class BaseEncoder(layers.Layer, _IterableVars):
             "kernel_regularizer": regularizers.serialize(self.kernel_regularizer),
             "bias_regularizer": regularizers.serialize(self.bias_regularizer),
             "kernel_constraint": constraints.serialize(self.kernel_constraint),
-            "bias_constraint": constraints.serialize(self.bias_constraint),
-            "downsampling_filters": self.downsampling_filters,
-            "downsampling_groups": self.downsampling_groups
+            "bias_constraint": constraints.serialize(self.bias_constraint)
         })
         
         return config
