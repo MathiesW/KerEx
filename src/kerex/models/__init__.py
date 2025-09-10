@@ -1,5 +1,5 @@
 from. autoencoder import FCN1D, FCN2D, FCN3D
-from .autoencoder import Unet1D, Unet2D, Unet3D
+from .autoencoder import Unet1D, Unet2D, Unet3D, SmoothUnet1D, SmoothUnet2D, SmoothUnet3D
 
 from .neural_operator import NeuralOperator1D, NeuralOperator2D
 
