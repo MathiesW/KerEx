@@ -22,46 +22,46 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         For `rank>1`, the `modes` can be defined in terms of tuples, 
         where each entry determines the modes in the respective direction,
         e.g., `modes=(8, 4)` will result in 8 modes in y, and 4 modes in x-direction.
-    input_projection_dimension : int, optional
+    input_projection_dimension : int, (optional)
         Projection dimension for the input layer.
-        If `None`, `input_projection_dimension` is set to the first argument in `filters`.
+        If `None`, there is no projection layer.
         Defaults to `None`.
-    output_projection_dimension : int, optional
+    output_projection_dimension : int, (optional)
         Projection dimension for the output layer.
-        If `None`, `output_projection_dimension` restores the initial channel dimension of the input data.
+        If `None`, there is no projection layer.
         Defaults to `None`.
-    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+    data_format : str, (optional) {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
         Defaults to `"channels_last"`.
-    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+    merge_layer : str | keras.layers.Layer, (optional) {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Merge operation in FNO layers to combine the result from the spectral convolution with the result from the bypass convolution.
         Defaults to `"add"`.
-    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+    activation : str | keras.activations.Activation | keras.layers.Layer, (optional)
         Global activation function.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"gelu"`.
-    use_bias : bool, optional
+    use_bias : bool, (optional)
         If `True`, all layers use a bias.
         Defaults to `True`.
-    kernel_initializer : str | keras.initializers.Initializer, optional
+    kernel_initializer : str | keras.initializers.Initializer, (optional)
         Kernel initializer.
         Defaults to `"he_normal"`.
-    bias_initializer : str | keras.initializers.Initializer, optional
+    bias_initializer : str | keras.initializers.Initializer, (optional)
         Bias initializer.
         Defaults to `"zeros"`.
-    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+    kernel_regularizer : str | keras.regularizers.Regularizer, (optional)
         Kernel regularizer.
         Defaults to `None`.
-    bias_regularizer : str | keras.regularizers.Regularizer, optional
+    bias_regularizer : str | keras.regularizers.Regularizer, (optional)
         Bias regularizer.
         Defaults to `None`.
-    kernel_constraint : str | keras.constraints.Constraint, optional
+    kernel_constraint : str | keras.constraints.Constraint, (optional)
         Kernel constraint.
         Defaults to `None`.
-    bias_constraint : str | keras.constraints.Constraint, optional
+    bias_constraint : str | keras.constraints.Constraint, (optional)
         Bias constraint.
         Defaults to `None`.
-    name : str, optional
+    name : str, (optional)
         Name of the model.
         If `None`, `name` is automatically inherited from the class name `"BaseNeuralOperator"`.
         Defaults to `None`.
@@ -124,14 +124,20 @@ class BaseNeuralOperator(models.Model, _IterableVars):
             bias_constraint=self.bias_constraint
         )
 
-        self.input_projection = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
-            filters=self.input_projection_dimension or self.filters[0], 
-            kernel_size=1, 
-            name="input_projection",
-            **layer_kwargs
-        )
+        self.layers_ = []
+        
+        # add input projection
+        if input_projection_dimension is not None:
+            input_projection = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
+                filters=self.input_projection_dimension,
+                kernel_size=1, 
+                name="input_projection",
+                **layer_kwargs
+            )
+            self.layers_.append(input_projection)
 
-        self.fno_layers = models.Sequential([
+        # add FNO layers
+        self.layers_.extend([
             getattr(import_module(name="...layers", package=__package__), f"FNO{self.rank}D")(
                 filters=f, 
                 modes=m,
@@ -139,14 +145,17 @@ class BaseNeuralOperator(models.Model, _IterableVars):
                 merge_layer=self.merge_layer,
                 **layer_kwargs
             ) for f, m in zip(self.filters, self.modes)
-        ], name="fno_layers")
+        ])
 
-        self.output_projection = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
-            filters=self.output_projection_dimension or 1,  # this is updated in build method IF self.output_projection_filters is None
-            kernel_size=1, 
-            name="output_projection",
-            **layer_kwargs
-        )
+        # add output projection
+        if self.output_projection_dimension is not None:
+            output_projection = getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
+                filters=self.output_projection_dimension,  # or 1,  # this is updated in build method IF self.output_projection_filters is None
+                kernel_size=1, 
+                name="output_projection",
+                **layer_kwargs
+            )
+            self.layers_.append(output_projection)
 
     def build(self, input_shape):
         """
@@ -163,14 +172,8 @@ class BaseNeuralOperator(models.Model, _IterableVars):
 
         if self.built:
             return
-        
-        if self.output_projection_dimension is None:
-            # update filters attribute of `self.output_projection` layer
-            # by default, the FNO output projection projects back to the initial dimension
-            projection_filters = input_shape[-1 if self.data_format == "channels_last" else 1]
-            self.output_projection.filters = projection_filters
-                        
-        for layer in [self.input_projection, self.fno_layers, self.output_projection]:
+
+        for layer in self.layers_:
             layer.build(input_shape=input_shape)
             input_shape = layer.compute_output_shape(input_shape=input_shape)
 
@@ -195,10 +198,9 @@ class BaseNeuralOperator(models.Model, _IterableVars):
             outputs of `BaseNeuralOperator`
 
         """
-
-        x = self.input_projection(inputs)
-        x = self.fno_layers(x)
-        x = self.output_projection(x)
+        x = inputs
+        for layer in self.layers:
+            x = layer(x)
 
         return x
     
@@ -304,24 +306,24 @@ class BaseNeuralOperator(models.Model, _IterableVars):
 
         Parameters
         ----------
-        line_length: int, optional
+        line_length: int, (optional)
             Total length of printed lines
             (e.g. set this to adapt the display to different
             terminal window sizes).
-        positions: list, optional
+        positions: list, (optional)
             Relative or absolute positions of log elements
             in each line. If not provided, becomes
             `[0.3, 0.6, 0.70, 1.]`. Defaults to `None`.
-        print_fn: callable, optional
+        print_fn: callable, (optional)
             Print function to use. By default, prints to `stdout`.
             If `stdout` doesn't work in your environment, change to `print`.
             It will be called on each line of the summary.
             You can set it to a custom function
             in order to capture the string summary.
-        show_trainable: bool, optional
+        show_trainable: bool, (optional)
             Whether to show if a layer is trainable.
             Defaults to `False`.
-        layer_range: list | tuple, optional
+        layer_range: list | tuple, (optional)
             a list or tuple of 2 strings,
             which is the starting layer name and ending layer name
             (both inclusive) indicating the range of layers to be printed

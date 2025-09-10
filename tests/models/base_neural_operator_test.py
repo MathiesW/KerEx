@@ -79,7 +79,7 @@ def test_backprop(data_format):
     x = ops.ones((1, 16, 16, 3) if data_format == "channels_last" else (1, 3, 16, 16))
     y = ops.ones((1, 16, 16, 1) if data_format == "channels_last" else (1, 1, 16, 16))
 
-    model = BaseModel(rank=2, filters=4, modes=4, output_projection_dimension=1, data_format=data_format)
+    model = BaseModel(rank=2, filters=4, modes=4, input_projection_dimension=32, output_projection_dimension=1, data_format=data_format)
     model.build(input_shape=x.shape)
     model.compile(optimizer="adam", loss="mse")
 
