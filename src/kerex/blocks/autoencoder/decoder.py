@@ -1,8 +1,8 @@
-from .base_decoder import BaseDecoder
+from .base_decoder import BaseDecoder, BaseSmoothDecoder
 from keras import saving
 
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Decoder1D")
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="Decoder1D")
 class Decoder1D(BaseDecoder):
     """
     1-D convolutional decoder block
@@ -114,7 +114,7 @@ class Decoder1D(BaseDecoder):
         )
     
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Decoder2D")
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="Decoder2D")
 class Decoder2D(BaseDecoder):
     """
     2-D convolutional decoder block
@@ -220,7 +220,7 @@ class Decoder2D(BaseDecoder):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Decoder3D")
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="Decoder3D")
 class Decoder3D(BaseDecoder):
     """
     3-D convolutional decoder block
@@ -313,6 +313,146 @@ class Decoder3D(BaseDecoder):
             dilation_rate=dilation_rate, 
             groups=groups, 
             merge_layer=merge_layer, 
+            activation=activation, 
+            use_bias=use_bias, 
+            kernel_initializer=kernel_initializer, 
+            bias_initializer=bias_initializer, 
+            kernel_regularizer=kernel_regularizer, 
+            bias_regularizer=bias_regularizer, 
+            kernel_constraint=kernel_constraint, 
+            bias_constraint=bias_constraint, 
+            name=name, 
+            **kwargs
+        )
+
+### DECODER USING SMOOTH UPSAMPLING ###
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="SmoothDecoder1D")
+class SmoothDecoder1D(BaseSmoothDecoder):
+    def __init__(
+            self, 
+            filters, 
+            kernel_size=5, 
+            strides=1, 
+            padding="same",
+            data_format="channels_last", 
+            dilation_rate=1, 
+            groups=1, 
+            merge_layer="concatenate",
+            activation="relu", 
+            use_bias=True, 
+            kernel_initializer="he_normal", 
+            bias_initializer="zeros", 
+            kernel_regularizer=None, 
+            bias_regularizer=None, 
+            kernel_constraint=None, 
+            bias_constraint=None, 
+            name=None, 
+            **kwargs
+        ):
+        super().__init__(
+            rank=1,
+            filters=filters, 
+            kernel_size=kernel_size, 
+            strides=strides, 
+            padding=padding,
+            data_format=data_format, 
+            dilation_rate=dilation_rate, 
+            groups=groups, 
+            merge_layer=merge_layer,
+            activation=activation, 
+            use_bias=use_bias, 
+            kernel_initializer=kernel_initializer, 
+            bias_initializer=bias_initializer, 
+            kernel_regularizer=kernel_regularizer, 
+            bias_regularizer=bias_regularizer, 
+            kernel_constraint=kernel_constraint, 
+            bias_constraint=bias_constraint, 
+            name=name, 
+            **kwargs
+        )
+
+
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="SmoothDecoder2D")
+class SmoothDecoder2D(BaseSmoothDecoder):
+    def __init__(
+            self, 
+            filters, 
+            kernel_size=5, 
+            strides=1, 
+            padding="same",
+            data_format="channels_last", 
+            dilation_rate=1, 
+            groups=1, 
+            merge_layer="concatenate",
+            interpolation="nearest",
+            activation="relu", 
+            use_bias=True, 
+            kernel_initializer="he_normal", 
+            bias_initializer="zeros", 
+            kernel_regularizer=None, 
+            bias_regularizer=None, 
+            kernel_constraint=None, 
+            bias_constraint=None, 
+            name=None, 
+            **kwargs
+        ):
+        super().__init__(
+            rank=2, 
+            filters=filters, 
+            kernel_size=kernel_size, 
+            strides=strides, 
+            padding=padding,
+            data_format=data_format, 
+            dilation_rate=dilation_rate, 
+            groups=groups, 
+            merge_layer=merge_layer,
+            interpolation=interpolation,
+            activation=activation, 
+            use_bias=use_bias, 
+            kernel_initializer=kernel_initializer, 
+            bias_initializer=bias_initializer, 
+            kernel_regularizer=kernel_regularizer, 
+            bias_regularizer=bias_regularizer, 
+            kernel_constraint=kernel_constraint, 
+            bias_constraint=bias_constraint, 
+            name=name, 
+            **kwargs
+        )
+
+
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="SmoothDecoder3D")
+class SmoothDecoder3D(BaseSmoothDecoder):
+    def __init__(
+            self, 
+            filters, 
+            kernel_size=5, 
+            strides=1, 
+            padding="same",
+            data_format="channels_last", 
+            dilation_rate=1, 
+            groups=1, 
+            merge_layer="concatenate",
+            activation="relu", 
+            use_bias=True, 
+            kernel_initializer="he_normal", 
+            bias_initializer="zeros", 
+            kernel_regularizer=None, 
+            bias_regularizer=None, 
+            kernel_constraint=None, 
+            bias_constraint=None, 
+            name=None, 
+            **kwargs
+        ):
+        super().__init__(
+            rank=3,
+            filters=filters, 
+            kernel_size=kernel_size, 
+            strides=strides, 
+            padding=padding,
+            data_format=data_format, 
+            dilation_rate=dilation_rate, 
+            groups=groups, 
+            merge_layer=merge_layer,
             activation=activation, 
             use_bias=use_bias, 
             kernel_initializer=kernel_initializer, 
