@@ -7,10 +7,11 @@ from typing import Union, Tuple
 
 if backend() == 'jax':
     from .jax import fft_fn, ifft_fn, fft2_fn, ifft2_fn, fft3_fn, ifft3_fn, rfft_fn, irfft_fn, rfft2_fn, irfft2_fn, rfft3_fn, irfft3_fn
+    from .jax import fft_derivative as _fft_derivative
 
 if backend() == 'tensorflow':
     from .tensorflow import fft_fn, ifft_fn, fft2_fn, fft3_fn, ifft3_fn, ifft2_fn, rfft_fn, irfft_fn, rfft2_fn, irfft2_fn, rfft3_fn, irfft3_fn
-
+    from .tensorflow import fft_derivative as _fft_derivative
 
 def cast_to_complex(x: Union[Tuple[KerasTensor, KerasTensor], KerasTensor]) -> Tuple[KerasTensor, KerasTensor]:
     if isinstance(x, tuple):
@@ -30,12 +31,12 @@ class FFT(Operation):
     Keras3 does not support complex dtypes.
     Therefore, the `keras.ops.fft` is quite cumbersume to use, since it explicitly requires the definition of a real and a complex part when calling `fft` ::
 
-        >>> from keras import ops
-        >>> x = ops.ones((4,))
-        >>> ops.fft(x)
-        ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-        >>> ops.fft((x, ops.zeros_like(x)))
-        array([4.,  0.,  0.,  0.], dtype=float32), array([0., 0., 0., 0.], dtype=float32)
+    >>> from keras import ops
+    >>> x = ops.ones((4,))
+    >>> ops.fft(x)
+    ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+    >>> ops.fft((x, ops.zeros_like(x)))
+    array([4.,  0.,  0.,  0.], dtype=float32), array([0., 0., 0., 0.], dtype=float32)
     
     This implementation attempts to increase the user-friendliness of the FFT call in Keras by handling the input automatically.
 
@@ -631,3 +632,83 @@ def irfft3(x, n=None):
         return IRFFT3().symbolic_call(x, n=n)
     return irfft3_fn(x, n=n)
 
+
+# === FFT Derivative ===
+class FFTDerivative(Operation):
+    def __init__(self):
+        super().__init__()
+
+    def compute_output_spec(self, x):
+        """
+        Compute output spec of Fourier transform
+
+        Parameters
+        ----------
+        x : KerasTensor | tuple | list
+            Real- or complex input to FFT. A complex input must be composed of a tuple or list of the real- and imaginary part `(x_real, x_imag)`.
+
+        Returns
+        -------
+        diff_spec : KerasTensor
+            spec of derivative of x
+
+        """
+        if not isinstance(x, (tuple, list)) or len(x) != 2:
+            real = x
+            imag = ops.zeros_like(x)
+        else:
+            real, imag = x
+        # Both real and imaginary parts should have the same shape.
+        if real.shape != imag.shape:
+            raise ValueError(
+                "Input `x` should be a tuple of two tensors - real and "
+                "imaginary. Both the real and imaginary parts should have the "
+                f"same shape. Received: x[0].shape = {real.shape}, "
+                f"x[1].shape = {imag.shape}"
+            )
+        return KerasTensor(shape=real.shape, dtype=real.dtype)
+    
+    def call(self, x, axis=-1, d=1.0, n=1):
+        """
+        Derivative in Fourier space
+
+        Parameters
+        ----------
+        x : tf.Tensor
+            Input array, can be either real or complex valued.
+        axis : int (optional)
+            Axis along which `x` is derived.
+            Defaults to `-1`.
+        d : float (optional)
+            Discretization of `x` along the dimension of `axis`.
+            Defaults to `1.0`.
+        n : int (optional)
+            Order of differentiation.
+            Defaults to `1`.
+
+        """
+
+        return _fft_derivative(x=x, axis=axis, d=d, n=n)
+    
+def fft_derivative(x, axis=-1, d=1.0, n=1):
+    """
+    Derivative in Fourier space
+
+    Parameters
+    ----------
+    x : tf.Tensor
+        Input array, can be either real or complex valued.
+    axis : int (optional)
+        Axis along which `x` is derived.
+        Defaults to `-1`.
+    d : float (optional)
+        Discretization of `x` along the dimension of `axis`.
+        Defaults to `1.0`.
+    n : int (optional)
+        Order of differentiation.
+        Defaults to `1`.
+
+    """
+    if any_symbolic_tensors(cast_to_complex(x)):
+        return FFTDerivative.symbolic_call(x)
+    return fft_derivative(x)

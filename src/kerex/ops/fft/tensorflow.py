@@ -1,6 +1,7 @@
 import tensorflow as tf
 from typing import Tuple
 from functools import partial
+from math import pi
 
 
 def _get_complex_tensor_from_tuple(x):
@@ -59,6 +60,89 @@ def _irfft(x: tf.Tensor, fn: callable, n: tuple = None) -> tf.Tensor:
     complex_input = _get_complex_tensor_from_tuple(x)
     complex_output = fn(complex_input, fft_length=n)
     return tf.math.real(complex_output), tf.math.imag(complex_output)
+
+
+# === FFT derivatives ===
+def fftfreq(n, d, rad=False):
+    fs = 1.0 / d
+    df = fs / tf.cast(n, tf.float32)
+    fft_freqs = tf.cast(tf.range(n) - n // 2, tf.float32)
+    fft_freqs *= df
+
+    if rad:
+        fft_freqs *= (2.0 * pi)
+
+    fft_freqs = tf.roll(fft_freqs, shift=n // 2, axis=0)
+    return fft_freqs
+
+
+# === FFT derivative ===
+def fft_derivative(x, axis=-1, d=1.0, n=1):
+    """
+    Derivative in Fourier space
+
+    Parameters
+    ----------
+    x : tf.Tensor
+        Input array, can be either real or complex valued.
+    axis : int (optional)
+        Axis along which `x` is derived.
+        Defaults to `-1`.
+    d : float (optional)
+        Discretization of `x` along the dimension of `axis`.
+        Defaults to `1.0`.
+    n : int (optional)
+        Order of differentiation.
+        Defaults to `1`.
+
+    Returns
+    -------
+    dx : tf.Tensor
+        nth derivative of `x` along `axis`.
+
+    Examples
+    --------
+    >>> n = 32
+    >>> t = tf.range(0, 2 * pi, 2 * pi / 32)
+    >>> dt = 2 * pi / 32
+    >>> x = tf.sin(t)
+    >>> dxdt_ref = tf.cos(t)
+    >>> dxdt = fft_derivative(x, d=dt)
+    >>> tf.reduce_max(dxdt_ref - dxdt)  
+    tf.Tensor(1.0728836e-06, shape=(), dtype=float32)
+
+    Notes
+    -----
+    For higher orders, the derivatives may get noisy.
+    The intensity depends on the signal length, i.e.,
+    this effect is less significant for short signals.
+
+    """
+    
+    nx = tf.shape(x)[axis]
+    dim = len(tf.shape(x))
+
+    # tf.signal.fft is always along last axis --> move axis to last dimension
+    if dim > 2:
+        perm = list(range(dim))
+        perm.append(perm.pop(axis))
+
+        x = tf.transpose(x, perm=perm)
+
+    x = _get_complex_tensor_from_tuple(x)
+    freqs = fftfreq(n=nx, d=d, rad=True)
+
+    complex_diff = tf.signal.ifft(tf.pow((1j * tf.cast(freqs, x.dtype)), tf.cast(n, x.dtype)) * tf.signal.fft(x))
+    diff = tf.math.real(complex_diff)
+
+    # revert permutation
+    if dim > 2:
+        perm = list(range(dim))
+        perm.insert(axis + 1, perm.pop())
+        diff = tf.transpose(diff, perm=perm)
+
+    return diff
+
 
 # === derived functions
 def fft_fn(x):
