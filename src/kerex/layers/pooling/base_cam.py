@@ -54,6 +54,7 @@ class BaseChannelAttentionModule(layers.Layer):
 
         self.avg_pooling = get_layer(f"GlobalAveragePooling{self.rank}D", data_format=self.data_format, keepdims=self.keepdims)
         self.max_pooling = get_layer(f"GlobalMaxPooling{self.rank}D", data_format=self.data_format, keepdims=self.keepdims)
+        self.merge_layer = layers.Concatenate(axis=self.channel_axis)
         self.activation_fn = activations.get(self.activation)
 
     def build(self, input_shape):
@@ -80,18 +81,18 @@ class BaseChannelAttentionModule(layers.Layer):
             layers.Dense(units=num_ch)
         ])
 
-        # get input shape for mlp
-        feature_axes = list(range(len(input_shape)))
-        feature_axes.pop(self.channel_axis)  # remove channel axis
-        feature_axes.pop(0)  # remove batch dimension
+        # forward pass with updated input shapes
+        self.max_pooling.build(input_shape=input_shape)
+        self.avg_pooling.build(input_shape=input_shape)
 
-        # overwrite feature axes with 1
-        for a in feature_axes:
-            input_shape[a] = 1
+        maxpool_output_shape = self.max_pooling.compute_output_shape(input_shape=input_shape)
+        avgpool_output_shape = self.avg_pooling.compute_output_shape(input_shape=input_shape)
 
-        input_shape[self.channel_axis] = 2 * num_ch
+        self.merge_layer.build(input_shape=(maxpool_output_shape, avgpool_output_shape))
 
-        self.mlp.build(input_shape=tuple(input_shape))
+        merge_output_shape = self.merge_layer.compute_output_shape(input_shape=(maxpool_output_shape, avgpool_output_shape))
+
+        self.mlp.build(input_shape=merge_output_shape)
 
         self.built = True
 
@@ -139,11 +140,12 @@ class BaseChannelAttentionModule(layers.Layer):
 
         """
 
-        output_shape = [1] * len(input_shape)
-        output_shape[0] = input_shape[0]
-        output_shape[self.channel_axis] = input_shape[self.channel_axis]
+        maxpool_output_shape = self.max_pooling.compute_output_shape(input_shape=input_shape)
+        avgpool_output_shape = self.avg_pooling.compute_output_shape(input_shape=input_shape)
+        merge_output_shape = self.merge_layer.compute_output_shape(input_shape=(maxpool_output_shape, avgpool_output_shape))
+        mlp_output_shape = self.mlp.compute_output_shape(input_shape=merge_output_shape)
 
-        return tuple(output_shape)
+        return tuple(mlp_output_shape)
 
     def get_config(self):
         """
