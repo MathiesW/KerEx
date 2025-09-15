@@ -2,7 +2,7 @@ from .base_encoder import BaseEncoder
 from keras import saving
 
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Encoder1D")
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="Encoder1D")
 class Encoder1D(BaseEncoder):
     """
     1-D convolutional encoder block
@@ -118,7 +118,7 @@ class Encoder1D(BaseEncoder):
         )
     
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Encoder2D")
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="Encoder2D")
 class Encoder2D(BaseEncoder):
     """
     2-D convolutional encoder block
@@ -228,7 +228,7 @@ class Encoder2D(BaseEncoder):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Autoencoder", name="Encoder3D")
+@saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="Encoder3D")
 class Encoder3D(BaseEncoder):
     """
     3-D convolutional encoder block

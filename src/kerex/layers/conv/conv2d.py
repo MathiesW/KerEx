@@ -2,7 +2,7 @@ from .base_conv import MyBaseConv, MyBaseConvTranspose, MyBaseSeparableConv
 from keras import saving
 
 
-@saving.register_keras_serializable(package="MyConv", name="Conv2D")
+@saving.register_keras_serializable(package="Kerex.Layers", name="Conv2D")
 class Conv2D(MyBaseConv):
     """2D convolution layer.
 
@@ -128,7 +128,7 @@ class Conv2D(MyBaseConv):
         )
     
 
-@saving.register_keras_serializable(package="MyConv", name="Conv2DTranspose")
+@saving.register_keras_serializable(package="Kerex.Layers", name="Conv2DTranspose")
 class Conv2DTranspose(MyBaseConvTranspose):
     """2D transposed convolution layer.
 
@@ -254,7 +254,7 @@ class Conv2DTranspose(MyBaseConvTranspose):
         )
 
 
-@saving.register_keras_serializable(package="MyConv", name="SeparableConv2D")
+@saving.register_keras_serializable(package="Kerex.Layers", name="SeparableConv2D")
 class SeparableConv2D(MyBaseSeparableConv):
     """2D separable convolution layer.
 

@@ -2,7 +2,7 @@ from keras import saving
 from keras import layers
 
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks", name="TSMixerBlock")
+@saving.register_keras_serializable(package="Kerex.Blocks", name="TSMixerBlock")
 class TSMixerBlock(layers.Layer):
     """
     TSMixer block, cf. [Chen et al.](https://doi.org/10.48550/arXiv.2303.06053)

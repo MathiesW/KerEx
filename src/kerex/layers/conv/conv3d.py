@@ -2,7 +2,7 @@ from .base_conv import MyBaseConv, MyBaseConvTranspose
 from keras import saving
 
 
-@saving.register_keras_serializable(package="MyConv", name="Conv3D")
+@saving.register_keras_serializable(package="Kerex.Layers", name="Conv3D")
 class Conv3D(MyBaseConv):
     """3D convolution layer.
 
@@ -135,7 +135,7 @@ class Conv3D(MyBaseConv):
 
     
 
-@saving.register_keras_serializable(package="MyConv", name="Conv3DTranspose")
+@saving.register_keras_serializable(package="Kerex.Layers", name="Conv3DTranspose")
 class Conv3DTranspose(MyBaseConvTranspose):
     """3D transposed convolution layer.
 

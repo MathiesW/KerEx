@@ -3,7 +3,7 @@ from keras import layers
 from keras.src import ops
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layers.Attention", name="MultiHeadAttention")
+@saving.register_keras_serializable(package="Kerex.Blocks.Attention", name="MultiHeadAttention")
 class MultiHeadAttention(layers.MultiHeadAttention):
     """
     
@@ -221,7 +221,7 @@ class MultiHeadAttention(layers.MultiHeadAttention):
         return attention_output
 
 
-@saving.register_keras_serializable(package="KerasAddon.Layers.Attention", name="BaseAttention")
+@saving.register_keras_serializable(package="Kerex.Blocks.Attention", name="BaseAttention")
 class BaseAttention(layers.Layer):
     """
     Base multihead-attention layer as described in the paper "Attention is all you Need" [Vaswani et al., 2017](https://arxiv.org/abs/1706.03762).

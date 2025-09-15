@@ -2,7 +2,7 @@ from keras import saving
 from .base_cam import BaseChannelAttentionModule
 
 
-@saving.register_keras_serializable(package="Kerex.Layers", name="ChannelAttentionModule1D")
+@saving.register_keras_serializable(package="Kerex.Layers.Pooling", name="ChannelAttentionModule1D")
 class ChannelAttentionModule1D(BaseChannelAttentionModule):
     """
     Convolutional Channel Attention Module (CAM)
@@ -58,7 +58,7 @@ class ChannelAttentionModule1D(BaseChannelAttentionModule):
         )
 
 
-@saving.register_keras_serializable(package="Kerex.Layers", name="ChannelAttentionModule2D")
+@saving.register_keras_serializable(package="Kerex.Layers.Pooling", name="ChannelAttentionModule2D")
 class ChannelAttentionModule2D(BaseChannelAttentionModule):
     """
     Convolutional Channel Attention Module (CAM)
@@ -114,7 +114,7 @@ class ChannelAttentionModule2D(BaseChannelAttentionModule):
         )
 
 
-@saving.register_keras_serializable(package="Kerex.Layers", name="ChannelAttentionModule3D")
+@saving.register_keras_serializable(package="Kerex.Layers.Pooling", name="ChannelAttentionModule3D")
 class ChannelAttentionModule3D(BaseChannelAttentionModule):
     """
     Convolutional Channel Attention Module (CAM)

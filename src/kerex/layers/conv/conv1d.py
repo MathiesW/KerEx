@@ -3,7 +3,7 @@ from .base_conv import MyBaseConv, MyBaseConvTranspose
 from keras import saving
 
 
-@saving.register_keras_serializable(package="MyConv", name="Conv1D")
+@saving.register_keras_serializable(package="Kerex.Layers", name="Conv1D")
 class Conv1D(MyBaseConv):
     """1D convolution layer (e.g. temporal convolution).
 
@@ -170,7 +170,7 @@ class Conv1D(MyBaseConv):
         return outputs
     
 
-@saving.register_keras_serializable(package="MyConv", name="Conv1DTranspose")
+@saving.register_keras_serializable(package="Kerex.Layers", name="Conv1DTranspose")
 class Conv1DTranspose(MyBaseConvTranspose):
     """1D transposed convolution layer.
 

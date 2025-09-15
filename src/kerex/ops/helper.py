@@ -206,7 +206,7 @@ def capitalize_first_char(s):
     return re.sub('([a-zA-Z])', lambda x: x.groups()[0].upper(), s, 1)
 
 
-@saving.register_keras_serializable(package="KerasAddon.Helper", name="get_layer")
+@saving.register_keras_serializable(package="Kerex.Helper", name="get_layer")
 def get_layer(identifier, module="keras.layers", registered_name=None, **layer_kwargs):
     """
     Get a layer from an identifier

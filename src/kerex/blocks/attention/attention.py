@@ -2,7 +2,7 @@ from keras import saving
 from .base_attention import BaseAttention
 
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Attention", name="GlobalSelfAttention")
+@saving.register_keras_serializable(package="Kerex.Blocks.Attention", name="GlobalSelfAttention")
 class GlobalSelfAttention(BaseAttention):
     """
     Global self-attention layer.
@@ -91,7 +91,7 @@ class GlobalSelfAttention(BaseAttention):
         return x
 
 
-@saving.register_keras_serializable(package="KerasAddon.Blocks.Attention", name="CausalSelfAttention")
+@saving.register_keras_serializable(package="Kerex.Blocks.Attention", name="CausalSelfAttention")
 class CausalSelfAttention(BaseAttention):
     """
     Causal self-attention layer.
@@ -190,7 +190,7 @@ class CausalSelfAttention(BaseAttention):
         return x
 
 
-@saving.register_keras_serializable(package="KerasAddon.Block.Attention", name="CrossAttention")
+@saving.register_keras_serializable(package="Kerex.Blocks.Attention", name="CrossAttention")
 class CrossAttention(BaseAttention):
     """
     Cross-attention layer.

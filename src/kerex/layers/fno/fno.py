@@ -2,7 +2,7 @@ from .base_fno import BaseFNO
 from keras import saving
 
 
-@saving.register_keras_serializable(package="KerasAddon.layers.FNO", name="FNO1D")
+@saving.register_keras_serializable(package="Kerex.Layers.FNO", name="FNO1D")
 class FNO1D(BaseFNO):
     def __init__(
         self, 
@@ -40,7 +40,7 @@ class FNO1D(BaseFNO):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.layers.FNO", name="FNO2D")
+@saving.register_keras_serializable(package="Kerex.Layers.FNO", name="FNO2D")
 class FNO2D(BaseFNO):
     def __init__(
         self, 
@@ -78,7 +78,7 @@ class FNO2D(BaseFNO):
         )
 
 
-@saving.register_keras_serializable(package="KerasAddon.layers.FNO", name="FNO3D")
+@saving.register_keras_serializable(package="Kerex.Layers.FNO", name="FNO3D")
 class FNO3D(BaseFNO):
     def __init__(
         self, 
