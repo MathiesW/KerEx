@@ -1,4 +1,4 @@
-from .base_upsampling import BaseSmoothUpSampling
+from .base_smooth_upsampling import BaseSmoothUpSampling
 from keras import layers
 from keras import saving
 
