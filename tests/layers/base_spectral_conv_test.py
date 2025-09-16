@@ -1,5 +1,5 @@
 from kerex.layers.fno.spectral_conv.base_spectral_conv import BaseSpectralConv
-from keras import ops, random
+from keras import ops, random, Sequential
 import pytest
 
 
@@ -86,3 +86,16 @@ def test_truncation_slice(rank):
     condition = array_equal(x[x_reconstructed != 0.0], x_reconstructed[x_reconstructed != 0.0])
 
     assert condition, f"Forward pass is faulty!"
+
+
+@pytest.mark.parametrize("rank", [1, 2, 3])
+def test_training(rank):
+    x = get_data(rank=rank)
+
+    model = Sequential([BaseSpectralConv(rank=rank, filters=DEFAULT_FILTERS, modes=DEFAULT_MODES)])
+    model.build(x.shape)
+    y = model(x)
+
+    # train
+    model.compile(optimizer="adam", loss="mse")
+    model.fit(x, y, epochs=2)
