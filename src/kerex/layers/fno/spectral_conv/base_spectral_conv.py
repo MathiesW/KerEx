@@ -23,7 +23,7 @@ class BaseSpectralConv(Layer):
         modes,
         data_format="channels_last",
         use_bias=True,
-        kernel_initializer="he_normal",
+        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
         bias_initializer="zeros",
         kernel_constraint=None,
         bias_constraint=None,
@@ -37,12 +37,20 @@ class BaseSpectralConv(Layer):
         self.filters = filters
         self.modes = standardize_tuple(modes, rank, name="modes")
         self.use_bias = use_bias
-        self.kernel_initializer = initializers.get(kernel_initializer)
+
+        # initializers, separate real- from imagniary part!
+        if isinstance(kernel_initializer, (list, tuple)):
+            self.real_kernel_initializer, self.imag_kernel_initializer = kernel_initializer
+        else:
+            self.real_kernel_initializer = self.imag_kernel_initializer = kernel_initializer
+
+        # self.kernel_initializer = initializers.get(kernel_initializer)
         self.bias_initializer = initializers.get(bias_initializer)
         self.kernel_regularizer = regularizers.get(kernel_regularizer)
         self.bias_regularizer = regularizers.get(bias_regularizer)
         self.kernel_constraint = constraints.get(kernel_constraint)
         self.bias_constraint = constraints.get(bias_constraint)
+
         self.data_format = standardize_data_format(data_format)
 
         fft_module = import_module(name="....ops.fft", package=__package__)
@@ -111,7 +119,7 @@ class BaseSpectralConv(Layer):
         self._real_kernel = self.add_weight(
             name="real_kernel",
             shape=kernel_shape,
-            initializer=self.kernel_initializer,
+            initializer=self.real_kernel_initializer,
             regularizer=self.kernel_regularizer,
             constraint=self.kernel_constraint,
             trainable=True,
@@ -120,7 +128,7 @@ class BaseSpectralConv(Layer):
         self._imag_kernel = self.add_weight(
             name="imag_kernel",
             shape=kernel_shape,
-            initializer=self.kernel_initializer,
+            initializer=self.imag_kernel_initializer,
             regularizer=self.kernel_regularizer,
             constraint=self.kernel_constraint,
             trainable=True,
@@ -128,16 +136,7 @@ class BaseSpectralConv(Layer):
         )
 
         if self.use_bias:
-            self._real_bias = self.add_weight(
-                name="bias",
-                shape=(self.filters,), 
-                initializer=self.bias_initializer,
-                regularizer=self.bias_regularizer,
-                constraint=self.bias_constraint,
-                trainable=True,
-                dtype=self.dtype
-            )
-            self._imag_bias = self.add_weight(
+            self._bias = self.add_weight(
                 name="bias",
                 shape=(self.filters,), 
                 initializer=self.bias_initializer,
@@ -147,8 +146,7 @@ class BaseSpectralConv(Layer):
                 dtype=self.dtype
             )
         else:
-            self._real_bias = None
-            self._imag_bias = None
+            self._bias = None
 
         """
         The layer operates in the complex Fourier space.
@@ -192,14 +190,14 @@ class BaseSpectralConv(Layer):
         # declare einsum operation to apply weights
         einsum_dim = "".join([d for _, d in zip(self.modes, ["X", "Y", "Z"])])  # einsum dimensions are just letters for each mode, i.e., "XY" for modes=(8, 16)
         self.einsum_op_forward = f"bi{einsum_dim},io{einsum_dim}->bo{einsum_dim}"
-        self.einsum_op_bias = f"bo{einsum_dim},o->bo{einsum_dim}"
+        self.einsum_op_bias = f"b{einsum_dim}o,o->b{einsum_dim}o" if self.data_format == "channels_last" else f"bo{einsum_dim},o->bo{einsum_dim}"
 
         if backend() == "tensorflow":
             # Backpropagation with `tensorflow` backend is a bit cumbersome and requires the exact gradient flow.
             # Therefore, we must declare additional `einsum_ops`.
             self.einsum_op_backprop_weights = f"bo{einsum_dim},bi{einsum_dim}->io{einsum_dim}"
             self.einsum_op_backprop_x = f"bo{einsum_dim},io{einsum_dim}->bi{einsum_dim}"
-            self.einsum_op_backprop_bias = f"bo{einsum_dim}->o"  # sum over all axis except output channels
+            self.einsum_op_backprop_bias = f"b{einsum_dim}o->o" if self.data_format == "channels_last" else f"bo{einsum_dim}->o" # sum over all axis except output channels
 
         self.built = True
 
@@ -370,11 +368,6 @@ class BaseSpectralConv(Layer):
                 y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)  # (None, ch_out, *m)
                 y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)  # (None, ch_out, *m)
 
-                # add bias
-                if self.use_bias:
-                    y_real_truncated = ops.einsum(self.einsum_op_bias, y_real_truncated, self._real_bias)  # (None, ch_out, *m)
-                    y_imag_truncated = ops.einsum(self.einsum_op_bias, y_imag_truncated, self._imag_bias)  # (None, ch_out, *m)
-
                 # pad to initial size
                 y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
                 y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
@@ -385,6 +378,10 @@ class BaseSpectralConv(Layer):
 
                 # reconstruct y via irfft
                 y = self.irfft((y_real, y_imag))  # (None, *x, ch_out)
+
+                # add bias
+                if self.use_bias:
+                    y = ops.einsum(self.einsum_op_bias, y, self._bias)
 
                 def backprop(dy, variables=None):
                     """
@@ -406,6 +403,11 @@ class BaseSpectralConv(Layer):
                     """
 
                     # input shape (None, *x, ch_out)
+                    
+                    # bias
+                    if self.use_bias:
+                        db = ops.einsum(self.einsum_op_backprop_bias, dy)  # (None, ch_out, *x)
+
                     # get real and imaginary part via rfft
                     dy_real, dy_imag = self.rfft(dy)  # (None, ch_out, *x)
                     
@@ -420,11 +422,6 @@ class BaseSpectralConv(Layer):
                     # compute gradients for weights
                     dw_real = ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_real_truncated) + ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_imag_truncated)  # (None, ch_out, *m)
                     dw_imag = ops.einsum(self.einsum_op_backprop_weights, dy_imag_truncated, x_real_truncated) - ops.einsum(self.einsum_op_backprop_weights, dy_real_truncated, x_imag_truncated)  # (None, ch_out, *m)
-
-                    if self.use_bias:
-                        # compute gradients for bias
-                        db_real = ops.einsum(self.einsum_op_backprop_bias, dy_real_truncated)  # (None, ch_out, *m)
-                        db_imag = ops.einsum(self.einsum_op_backprop_bias, dy_imag_truncated)  # (None, ch_out, *m)
 
                     # compute gradient for inputs
                     dx_real_truncated = ops.einsum(self.einsum_op_backprop_x, dy_real_truncated, self._real_kernel) + ops.einsum(self.einsum_op_backprop_x, dy_imag_truncated, self._imag_kernel)  # (None, ch_in, *m)
@@ -442,7 +439,7 @@ class BaseSpectralConv(Layer):
                     dx = self.irfft((dx_real, dx_imag))  # (None, *x, ch_in)
                     
                     if self.use_bias:
-                        grads = [db_real, db_imag, dw_real, dw_imag]
+                        grads = [db, dw_real, dw_imag]
                     else:
                         grads = [dw_real, dw_imag]
                     
