@@ -479,11 +479,6 @@ class BaseSpectralConv(Layer):
             y_real_truncated = ops.einsum(self.einsum_op_forward, x_real_truncated, self._real_kernel) - ops.einsum(self.einsum_op_forward, x_imag_truncated, self._imag_kernel)  # (None, ch_out, *m)
             y_imag_truncated = ops.einsum(self.einsum_op_forward, x_imag_truncated, self._real_kernel) + ops.einsum(self.einsum_op_forward, x_real_truncated, self._imag_kernel)  # (None, ch_out, *m)
 
-            # add bias
-            if self.use_bias:
-                y_real_truncated = ops.einsum(self.einsum_op_bias, y_real_truncated, self._real_bias)  # (None, ch_out, *m)
-                y_imag_truncated = ops.einsum(self.einsum_op_bias, y_imag_truncated, self._imag_bias)  # (None, ch_out, *m)
-
             # pad to initial size
             y_real = ops.pad(y_real_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
             y_imag = ops.pad(y_imag_truncated, pad_width=self.pad_width)  # (None, ch_out, *x)
@@ -494,6 +489,10 @@ class BaseSpectralConv(Layer):
 
             # reconstruct y via irfft
             y = self.irfft((y_real, y_imag))  # (None, *x, ch_out)
+
+            # add bias
+            if self.use_bias:
+                y = ops.einsum(self.einsum_op_bias, y, self._bias)
 
             return y
 
