@@ -22,46 +22,46 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         For `rank>1`, the `modes` can be defined in terms of tuples, 
         where each entry determines the modes in the respective direction,
         e.g., `modes=(8, 4)` will result in 8 modes in y, and 4 modes in x-direction.
-    input_projection_dimension : int, (optional)
+    input_projection_dimension : int, optional
         Projection dimension for the input layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    output_projection_dimension : int, (optional)
+    output_projection_dimension : int, optional
         Projection dimension for the output layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    data_format : str, (optional) {`"channels_first"`, `"channels_last"`}
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
-    merge_layer : str | keras.layers.Layer, (optional) {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Defaults to `None`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Merge operation in FNO layers to combine the result from the spectral convolution with the result from the bypass convolution.
         Defaults to `"add"`.
-    activation : str | keras.activations.Activation | keras.layers.Layer, (optional)
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
         Global activation function.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"gelu"`.
-    use_bias : bool, (optional)
+    use_bias : bool, optional
         If `True`, all layers use a bias.
         Defaults to `True`.
-    kernel_initializer : str | keras.initializers.Initializer, (optional)
+    kernel_initializer : str | keras.initializers.Initializer, optional
         Kernel initializer.
         Defaults to `"he_normal"`.
-    bias_initializer : str | keras.initializers.Initializer, (optional)
+    bias_initializer : str | keras.initializers.Initializer, optional
         Bias initializer.
         Defaults to `"zeros"`.
-    kernel_regularizer : str | keras.regularizers.Regularizer, (optional)
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
-    bias_regularizer : str | keras.regularizers.Regularizer, (optional)
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
         Bias regularizer.
         Defaults to `None`.
-    kernel_constraint : str | keras.constraints.Constraint, (optional)
+    kernel_constraint : str | keras.constraints.Constraint, optional
         Kernel constraint.
         Defaults to `None`.
-    bias_constraint : str | keras.constraints.Constraint, (optional)
+    bias_constraint : str | keras.constraints.Constraint, optional
         Bias constraint.
         Defaults to `None`.
-    name : str, (optional)
+    name : str, optional
         Name of the model.
         If `None`, `name` is automatically inherited from the class name `"BaseNeuralOperator"`.
         Defaults to `None`.
@@ -75,11 +75,11 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         modes,
         input_projection_dimension=None,
         output_projection_dimension=None,
-        data_format="channels_last",
+        data_format=None,
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer="he_normal",
+        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,
@@ -99,7 +99,11 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         self.input_projection_dimension = input_projection_dimension
         self.output_projection_dimension = output_projection_dimension
         
-        self.kernel_initializer = kernel_initializer
+        if isinstance(kernel_initializer, (list, tuple)):
+            self.real_kernel_initializer, self.imag_kernel_initializer = kernel_initializer
+        else:
+            self.real_kernel_initializer = self.imag_kernel_initializer = kernel_initializer
+
         self.bias_initializer = bias_initializer
         self.kernel_regularizer = kernel_regularizer
         self.bias_regularizer = bias_regularizer
@@ -116,7 +120,6 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         layer_kwargs = dict(
             data_format=self.data_format, 
             use_bias=self.use_bias,
-            kernel_initializer=self.kernel_initializer,
             bias_initializer=self.bias_initializer,
             kernel_regularizer=self.kernel_regularizer,
             bias_regularizer=self.bias_regularizer,
@@ -132,6 +135,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
                 filters=self.input_projection_dimension,
                 kernel_size=1, 
                 name="input_projection",
+                kernel_initializer=self.real_kernel_initializer,
                 **layer_kwargs
             )
             self.layers_.append(input_projection)
@@ -143,6 +147,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
                 modes=m,
                 activation=self.activation,
                 merge_layer=self.merge_layer,
+                kernel_initializer=(self.real_kernel_initializer, self.imag_kernel_initializer),
                 **layer_kwargs
             ) for f, m in zip(self.filters, self.modes)
         ])
@@ -153,6 +158,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
                 filters=self.output_projection_dimension,  # or 1,  # this is updated in build method IF self.output_projection_filters is None
                 kernel_size=1, 
                 name="output_projection",
+                kernel_initializer=self.real_kernel_initializer
                 **layer_kwargs
             )
             self.layers_.append(output_projection)
@@ -246,7 +252,8 @@ class BaseNeuralOperator(models.Model, _IterableVars):
             "merge_layer": saving.serialize_keras_object(self.merge_layer),
             "activation": saving.serialize_keras_object(self.activation),
             "use_bias": self.use_bias,
-            "kernel_initializer": initializers.serialize(self.kernel_initializer),
+            "real_kernel_initializer": initializers.serialize(self.real_kernel_initializer),
+            "imag_kernel_initializer": initializers.serialize(self.imag_kernel_initializer),
             "bias_initializer": initializers.serialize(self.bias_initializer),
             "kernel_regularizer": regularizers.serialize(self.kernel_regularizer),
             "bias_regularizer": regularizers.serialize(self.bias_regularizer),
@@ -277,7 +284,8 @@ class BaseNeuralOperator(models.Model, _IterableVars):
 
         activation_cfg = config.pop("activation")
         merge_layer_cfg = config.pop("merge_layer")
-        kernel_initializer_cfg = config.pop("kernel_initializer")
+        real_kernel_initializer_cfg = config.pop("real_kernel_initializer")
+        imag_kernel_initializer_cfg = config.pop("imag_kernel_initializer")
         bias_initializer_cfg = config.pop("bias_initializer")
         kernel_regularizer_cfg = config.pop("kernel_regularizer")
         bias_regularizer_cfg = config.pop("bias_regularizer")
@@ -288,7 +296,10 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         config.update({
             "activation": saving.deserialize_keras_object(activation_cfg),
             "merge_layer": saving.deserialize_keras_object(merge_layer_cfg),
-            "kernel_initializer": initializers.deserialize(kernel_initializer_cfg),
+            "kernel_initializer": (
+                initializers.deserialize(real_kernel_initializer_cfg), 
+                initializers.deserialize(imag_kernel_initializer_cfg)
+            ),
             "bias_initializer": initializers.deserialize(bias_initializer_cfg),
             "kernel_regularizer": regularizers.deserialize(kernel_regularizer_cfg),
             "bias_regularizer": regularizers.deserialize(bias_regularizer_cfg),

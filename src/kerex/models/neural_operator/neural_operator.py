@@ -1,4 +1,5 @@
 from keras import saving
+from keras import initializers
 from .base_neural_operator import BaseNeuralOperator
 
 
@@ -12,51 +13,54 @@ class NeuralOperator1D(BaseNeuralOperator):
     filters : int | list | tuple
         Number of filters for the sequential FNO layers.
         If this is a list/tuple, the length of this argument determines the number of FNO layers.
-    modes : int | list
+    modes : int | list | tuple
         Number of Fourier modes for FNO layers.
         An `int` results in global `modes`, a `list` allows to define the `modes` per FNO layer.
-    input_projection_dimension : int, (optional)
+        For `rank>1`, the `modes` can be defined in terms of tuples, 
+        where each entry determines the modes in the respective direction,
+        e.g., `modes=(8, 4)` will result in 8 modes in y, and 4 modes in x-direction.
+    input_projection_dimension : int, optional
         Projection dimension for the input layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    output_projection_dimension : int, (optional)
+    output_projection_dimension : int, optional
         Projection dimension for the output layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    data_format : str, (optional) {`"channels_first"`, `"channels_last"`}
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
-    merge_layer : str | keras.layers.Layer, (optional) {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Defaults to `None`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Merge operation in FNO layers to combine the result from the spectral convolution with the result from the bypass convolution.
         Defaults to `"add"`.
-    activation : str | keras.activations.Activation | keras.layers.Layer, (optional)
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
         Global activation function.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"gelu"`.
-    use_bias : bool, (optional)
+    use_bias : bool, optional
         If `True`, all layers use a bias.
         Defaults to `True`.
-    kernel_initializer : str | keras.initializers.Initializer, (optional)
+    kernel_initializer : str | keras.initializers.Initializer, optional
         Kernel initializer.
         Defaults to `"he_normal"`.
-    bias_initializer : str | keras.initializers.Initializer, (optional)
+    bias_initializer : str | keras.initializers.Initializer, optional
         Bias initializer.
         Defaults to `"zeros"`.
-    kernel_regularizer : str | keras.regularizers.Regularizer, (optional)
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
-    bias_regularizer : str | keras.regularizers.Regularizer, (optional)
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
         Bias regularizer.
         Defaults to `None`.
-    kernel_constraint : str | keras.constraints.Constraint, (optional)
+    kernel_constraint : str | keras.constraints.Constraint, optional
         Kernel constraint.
         Defaults to `None`.
-    bias_constraint : str | keras.constraints.Constraint, (optional)
+    bias_constraint : str | keras.constraints.Constraint, optional
         Bias constraint.
         Defaults to `None`.
-    name : str, (optional)
+    name : str, optional
         Name of the model.
-        If `None`, `name` is automatically inherited from the class name `"BaseNeuralOperator"`.
+        If `None`, `name` is automatically inherited from the class name `"NeuralOperator1D"`.
         Defaults to `None`.
 
     """
@@ -67,11 +71,11 @@ class NeuralOperator1D(BaseNeuralOperator):
         modes,
         input_projection_dimension=None,
         output_projection_dimension=None,
-        data_format="channels_last",
+        data_format=None,
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer="he_normal",
+        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,
@@ -114,66 +118,66 @@ class NeuralOperator2D(BaseNeuralOperator):
     modes : int | list | tuple
         Number of Fourier modes for FNO layers.
         An `int` results in global `modes`, a `list` allows to define the `modes` per FNO layer.
-        The `modes` can be defined in terms of tuples, 
+        For `rank>1`, the `modes` can be defined in terms of tuples, 
         where each entry determines the modes in the respective direction,
         e.g., `modes=(8, 4)` will result in 8 modes in y, and 4 modes in x-direction.
-    input_projection_dimension : int, (optional)
+    input_projection_dimension : int, optional
         Projection dimension for the input layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    output_projection_dimension : int, (optional)
+    output_projection_dimension : int, optional
         Projection dimension for the output layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    data_format : str, (optional) {`"channels_first"`, `"channels_last"`}
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
-    merge_layer : str | keras.layers.Layer, (optional) {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Defaults to `None`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Merge operation in FNO layers to combine the result from the spectral convolution with the result from the bypass convolution.
         Defaults to `"add"`.
-    activation : str | keras.activations.Activation | keras.layers.Layer, (optional)
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
         Global activation function.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"gelu"`.
-    use_bias : bool, (optional)
+    use_bias : bool, optional
         If `True`, all layers use a bias.
         Defaults to `True`.
-    kernel_initializer : str | keras.initializers.Initializer, (optional)
+    kernel_initializer : str | keras.initializers.Initializer, optional
         Kernel initializer.
         Defaults to `"he_normal"`.
-    bias_initializer : str | keras.initializers.Initializer, (optional)
+    bias_initializer : str | keras.initializers.Initializer, optional
         Bias initializer.
         Defaults to `"zeros"`.
-    kernel_regularizer : str | keras.regularizers.Regularizer, (optional)
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
-    bias_regularizer : str | keras.regularizers.Regularizer, (optional)
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
         Bias regularizer.
         Defaults to `None`.
-    kernel_constraint : str | keras.constraints.Constraint, (optional)
+    kernel_constraint : str | keras.constraints.Constraint, optional
         Kernel constraint.
         Defaults to `None`.
-    bias_constraint : str | keras.constraints.Constraint, (optional)
+    bias_constraint : str | keras.constraints.Constraint, optional
         Bias constraint.
         Defaults to `None`.
-    name : str, (optional)
+    name : str, optional
         Name of the model.
-        If `None`, `name` is automatically inherited from the class name `"BaseNeuralOperator"`.
+        If `None`, `name` is automatically inherited from the class name `"NeuralOperator2D"`.
         Defaults to `None`.
 
     """
-    
+
     def __init__(
         self,
         filters,
         modes,
         input_projection_dimension=None,
         output_projection_dimension=None,
-        data_format="channels_last",
+        data_format=None,
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer="he_normal",
+        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,
@@ -216,66 +220,66 @@ class NeuralOperator3D(BaseNeuralOperator):
     modes : int | list | tuple
         Number of Fourier modes for FNO layers.
         An `int` results in global `modes`, a `list` allows to define the `modes` per FNO layer.
-        The `modes` can be defined in terms of tuples, 
+        For `rank>1`, the `modes` can be defined in terms of tuples, 
         where each entry determines the modes in the respective direction,
         e.g., `modes=(8, 4)` will result in 8 modes in y, and 4 modes in x-direction.
-    input_projection_dimension : int, (optional)
+    input_projection_dimension : int, optional
         Projection dimension for the input layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    output_projection_dimension : int, (optional)
+    output_projection_dimension : int, optional
         Projection dimension for the output layer.
         If `None`, there is no projection layer.
         Defaults to `None`.
-    data_format : str, (optional) {`"channels_first"`, `"channels_last"`}
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
-    merge_layer : str | keras.layers.Layer, (optional) {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Defaults to `None`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Merge operation in FNO layers to combine the result from the spectral convolution with the result from the bypass convolution.
         Defaults to `"add"`.
-    activation : str | keras.activations.Activation | keras.layers.Layer, (optional)
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
         Global activation function.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"gelu"`.
-    use_bias : bool, (optional)
+    use_bias : bool, optional
         If `True`, all layers use a bias.
         Defaults to `True`.
-    kernel_initializer : str | keras.initializers.Initializer, (optional)
+    kernel_initializer : str | keras.initializers.Initializer, optional
         Kernel initializer.
         Defaults to `"he_normal"`.
-    bias_initializer : str | keras.initializers.Initializer, (optional)
+    bias_initializer : str | keras.initializers.Initializer, optional
         Bias initializer.
         Defaults to `"zeros"`.
-    kernel_regularizer : str | keras.regularizers.Regularizer, (optional)
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
-    bias_regularizer : str | keras.regularizers.Regularizer, (optional)
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
         Bias regularizer.
         Defaults to `None`.
-    kernel_constraint : str | keras.constraints.Constraint, (optional)
+    kernel_constraint : str | keras.constraints.Constraint, optional
         Kernel constraint.
         Defaults to `None`.
-    bias_constraint : str | keras.constraints.Constraint, (optional)
+    bias_constraint : str | keras.constraints.Constraint, optional
         Bias constraint.
         Defaults to `None`.
-    name : str, (optional)
+    name : str, optional
         Name of the model.
-        If `None`, `name` is automatically inherited from the class name `"BaseNeuralOperator"`.
+        If `None`, `name` is automatically inherited from the class name `"NeuralOperator3D"`.
         Defaults to `None`.
 
     """
-    
+
     def __init__(
         self,
         filters,
         modes,
         input_projection_dimension=None,
         output_projection_dimension=None,
-        data_format="channels_last",
+        data_format=None,
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer="he_normal",
+        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,

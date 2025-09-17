@@ -13,15 +13,69 @@ from functools import partial
 
 class BaseSpectralConv(Layer):
     """
-    https://arxiv.org/abs/2010.08895
+    Base Layer for spectral convolution (base of FNO, cf. https://arxiv.org/abs/2010.08895)
+
+    This layer
+    (1) transforms the layer into Fourier space via discrete Fourier transform for real-valued data (rfft),
+    (2) truncates the Fourier modes to the `modes` lowest modes,
+    (3) applies the weights (separated into real- and imaginary weights),
+    (4) pads the truncated signal in Fourier space back to its initial shape,
+    (5) applies inverse discrete Fourier transform for real-valued data (irfft), and
+    (6) applies the bias in physical space (if `use_bias=True`)
+
+    Parameters
+    ----------
+    rank : int {1, 2, 3}
+        Rank of subclassed SpectralConv layer
+    filters : int
+        Number of filters.
+    modes : int
+        Number of modes after truncation in Fourier space.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Format of the input data.
+        Defaults to `None`.
+    use_bias : bool, optional
+        If `True`, a bias term is added to the physical space after the spectral convolution.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializer.Initializer | tuple, optional
+        Initializer for real- and imaginary weights.
+        By default, the real weights are initialized using `"glorot_normal"`,
+        and the imaginary weights are initialized using `"random"` with a low standard deviation,
+        which is effectively white Gaussian noise.
+        Defaults to `("glorot_normal", initializers.RandomNormal(stddev=1e-3))`.
+    bias_initializer : str | keras.initializer.Initializer, optional
+        Initializer for the bias.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the model.
+        If `None`, `name` is automatically inherited from the class name `"BaseSpectralConv"`.
+        Defaults to `None`.
+
+    Notes
+    -----
+    For implementataion simplicity, the Fourier operations are always performed in `"channels_first"` data format.
+    The layer therefore applies a transpose operation if `data_format="channels_last"`.
     
     """
+
     def __init__(
         self,
         rank,
         filters,
         modes,
-        data_format="channels_last",
+        data_format=None,
         use_bias=True,
         kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
         bias_initializer="zeros",
@@ -53,7 +107,7 @@ class BaseSpectralConv(Layer):
 
         self.data_format = standardize_data_format(data_format)
 
-        fft_module = import_module(name="....ops.fft", package=__package__)
+        fft_module = import_module(name="keras_fft", package=__package__)
         self.rfft_fn = getattr(fft_module, "rfft" if self.rank == 1 else f"rfft{self.rank}")
         self.irfft_fn = getattr(fft_module, "irfft" if self.rank == 1 else f"irfft{self.rank}")
 
@@ -224,10 +278,6 @@ class BaseSpectralConv(Layer):
         x = self.transpose(x)
         x_real, x_imag = self.rfft_fn(x)
 
-        # # scale outputs for numerical stability in Fourier space
-        # x_real /= self.rfft_scaling
-        # x_imag /= self.rfft_scaling
-
         return x_real, x_imag
     
     def irfft(self, inputs):
@@ -252,9 +302,6 @@ class BaseSpectralConv(Layer):
 
         x_real, x_imag = inputs
         y_real = self.irfft_fn((x_real, x_imag))
-
-        # # scale back to "normal" scale
-        # y_real *= self.rfft_scaling
 
         return self.inverse_transpose(y_real)
 
@@ -543,7 +590,8 @@ class BaseSpectralConv(Layer):
             "modes": self.modes,
             "data_format": self.data_format,
             "use_bias": self.use_bias,
-            "kernel_initializer": initializers.serialize(self.kernel_initializer),
+            "real_kernel_initializer": initializers.serialize(self.real_kernel_initializer),
+            "imag_kernel_initializer": initializers.serialize(self.imag_kernel_initializer),
             "bias_initializer": initializers.serialize(self.bias_initializer),
             "kernel_constraint": constraints.serialize(self.kernel_constraint),
             "bias_constraint": constraints.serialize(self.bias_constraint),
@@ -571,15 +619,19 @@ class BaseSpectralConv(Layer):
             
         """
 
-        kernel_initializer_cfg = config.pop("kernel_initialzer")
-        bias_initializer_cfg = config.pop("bias_initialzer")
+        real_kernel_initializer_cfg = config.pop("real_kernel_initializer")
+        imag_kernel_initializer_cfg = config.pop("imag_kernel_initializer")
+        bias_initializer_cfg = config.pop("bias_initializer")
         kernel_constraint_cfg = config.pop("kernel_constraint")
         bias_constraint_cfg = config.pop("bias_constraint")
         kernel_regularizer_cfg = config.pop("kernel_regularizer")
         bias_regularizer_cfg = config.pop("bias_regularizer")
 
         config.update({
-            "kernel_initializer": initializers.deserialize(kernel_initializer_cfg),
+            "kernel_initializer": (
+                initializers.deserialize(real_kernel_initializer_cfg), 
+                initializers.deserialize(imag_kernel_initializer_cfg)
+            ),
             "bias_initializer": initializers.deserialize(bias_initializer_cfg),
             "kernel_constraint": constraints.deserialize(kernel_constraint_cfg),
             "bias_constraint": constraints.deserialize(bias_constraint_cfg),
