@@ -5,7 +5,6 @@ from keras import ops
 from keras.src.layers.input_spec import InputSpec
 from keras.src.backend import standardize_data_format
 from keras.src.utils.argument_validation import standardize_tuple
-# from keras.src.backend.config import backend
 
 
 class BaseFFTUpSampling(layers.Layer):
@@ -51,8 +50,8 @@ class BaseFFTUpSampling(layers.Layer):
         self.data_format = standardize_data_format(data_format)
 
         # import fft 
-        self.rfft_fn = getattr(import_module(name="...ops.fft", package=__package__), "rfft" if self.rank == 1 else f"rfft{self.rank}")
-        self.irfft_fn = getattr(import_module(name="...ops.fft", package=__package__), f"irfft" if self.rank == 1 else f"irfft{self.rank}")
+        self.rfft_fn = getattr(import_module(name="keras_fft", package=__package__), "rfft" if self.rank == 1 else f"rfft{self.rank}")
+        self.irfft_fn = getattr(import_module(name="keras_fft", package=__package__), f"irfft" if self.rank == 1 else f"irfft{self.rank}")
         
     def build(self, input_shape):
         if self.built:
