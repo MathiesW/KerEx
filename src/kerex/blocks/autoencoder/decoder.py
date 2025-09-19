@@ -22,7 +22,7 @@ class Decoder1D(BaseDecoder):
         Defaults to `"same"`.
     data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
+        Defaults to `None`.
     dilation_rate : int | list | tuple, optional
         Dilation rate for the convolutional forward sub-model.
         Defaults to 1.
@@ -75,7 +75,7 @@ class Decoder1D(BaseDecoder):
             kernel_size=5, 
             strides=1, 
             padding="same",
-            data_format="channels_last", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             merge_layer="concatenate",
@@ -131,7 +131,7 @@ class Decoder2D(BaseDecoder):
         Defaults to 1.
     data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
+        Defaults to `None`.
     dilation_rate : int | list | tuple, optional
         Dilation rate for the convolutional forward sub-model.
         Defaults to 1.
@@ -183,7 +183,7 @@ class Decoder2D(BaseDecoder):
             filters, 
             kernel_size=5, 
             strides=1, 
-            data_format="channels_last", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             merge_layer="concatenate",
@@ -237,7 +237,7 @@ class Decoder3D(BaseDecoder):
         Defaults to 1.
     data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
+        Defaults to `None`.
     dilation_rate : int | list | tuple, optional
         Dilation rate for the convolutional forward sub-model.
         Defaults to 1.
@@ -289,7 +289,7 @@ class Decoder3D(BaseDecoder):
             filters, 
             kernel_size=5, 
             strides=1, 
-            data_format="channels_last", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             merge_layer="concatenate",
@@ -334,7 +334,7 @@ class SmoothDecoder1D(BaseSmoothDecoder):
             kernel_size=5, 
             strides=1, 
             padding="same",
-            data_format="channels_last", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             merge_layer="concatenate",
@@ -380,7 +380,7 @@ class SmoothDecoder2D(BaseSmoothDecoder):
             kernel_size=5, 
             strides=1, 
             padding="same",
-            data_format="channels_last", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             merge_layer="concatenate",
@@ -428,7 +428,7 @@ class SmoothDecoder3D(BaseSmoothDecoder):
             kernel_size=5, 
             strides=1, 
             padding="same",
-            data_format="channels_last", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             merge_layer="concatenate",
