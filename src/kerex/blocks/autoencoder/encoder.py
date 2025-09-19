@@ -22,7 +22,7 @@ class Encoder1D(BaseEncoder):
         Defaults to `"same"`.
     data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
+        Defaults to `None`.
     dilation_rate : int | list | tuple, optional
         Dilation rate for the convolutional forward sub-model.
         Defaults to 1.
@@ -79,7 +79,7 @@ class Encoder1D(BaseEncoder):
             kernel_size=5, 
             strides=1, 
             padding="same",
-            data_format="channels_last", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             use_skip_connection = False, 
@@ -133,9 +133,12 @@ class Encoder2D(BaseEncoder):
     strides : int | list | tuple, optional
         Strides for the convolutional forward sub-model.
         Defaults to 1.
+    padding : str, optional {`"same"`, `"causal"`}
+        Padding that is applied to maintain deterministic data shapes.
+        Defaults to `"same"`.
     data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
+        Defaults to `None`.
     dilation_rate : int | list | tuple, optional
         Dilation rate for the convolutional forward sub-model.
         Defaults to 1.
@@ -191,7 +194,8 @@ class Encoder2D(BaseEncoder):
             filters, 
             kernel_size=5, 
             strides=1, 
-            data_format="channels_last", 
+            padding="same", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             use_skip_connection = False, 
@@ -211,6 +215,7 @@ class Encoder2D(BaseEncoder):
             filters=filters, 
             kernel_size=kernel_size, 
             strides=strides, 
+            padding=padding, 
             data_format=data_format, 
             dilation_rate=dilation_rate, 
             groups=groups, 
@@ -243,9 +248,12 @@ class Encoder3D(BaseEncoder):
     strides : int | list | tuple, optional
         Strides for the convolutional forward sub-model.
         Defaults to 1.
+    padding : str, optional {`"same"`, `"causal"`}
+        Padding that is applied to maintain deterministic data shapes.
+        Defaults to `"same"`.
     data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Data format for the convolution operations.
-        Defaults to `"channels_last"`.
+        Defaults to `None`.
     dilation_rate : int | list | tuple, optional
         Dilation rate for the convolutional forward sub-model.
         Defaults to 1.
@@ -301,7 +309,8 @@ class Encoder3D(BaseEncoder):
             filters, 
             kernel_size=5, 
             strides=1, 
-            data_format="channels_last", 
+            padding="same", 
+            data_format=None, 
             dilation_rate=1, 
             groups=1, 
             use_skip_connection = False, 
@@ -321,6 +330,7 @@ class Encoder3D(BaseEncoder):
             filters=filters, 
             kernel_size=kernel_size, 
             strides=strides, 
+            padding=padding, 
             data_format=data_format, 
             dilation_rate=dilation_rate, 
             groups=groups, 
