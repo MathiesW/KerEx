@@ -158,7 +158,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
                 filters=self.output_projection_dimension,  # or 1,  # this is updated in build method IF self.output_projection_filters is None
                 kernel_size=1, 
                 name="output_projection",
-                kernel_initializer=self.real_kernel_initializer
+                kernel_initializer=self.real_kernel_initializer, 
                 **layer_kwargs
             )
             self.layers_.append(output_projection)
