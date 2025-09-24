@@ -82,9 +82,6 @@ class BaseAttentionPooling(Layer):
     def build(self, input_shape):
         if self.built:
             return
-        
-        # build super class
-        super().build(input_shape)
 
         if self.data_format == "channels_last":
             channel_axis = -1
@@ -98,6 +95,7 @@ class BaseAttentionPooling(Layer):
 
         # reshape layer, flattens input if necessary
         self.reshape = layers.Reshape(target_shape=target_shape)
+        self.reshape.build(input_shape)
 
         # define input spec
         self.input_spec = InputSpec(
@@ -115,10 +113,15 @@ class BaseAttentionPooling(Layer):
             dtype=self.dtype
         )
 
+        # now define and build MHA layer
         self.mha = layers.MultiHeadAttention(
             num_heads=self.num_heads,
             key_dim=d_emb
         )
+        mha_input_shape = self.reshape.compute_output_shape(input_shape)
+        self.mha.build(query_shape=(None, self.num_queries, d_emb), value_shape=mha_input_shape)
+
+        self.built = True
 
     def call(self, inputs):
         flat_inputs = self.reshape(inputs)
