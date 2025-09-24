@@ -1,1 +1,2 @@
 from .cam import ChannelAttentionModule1D, ChannelAttentionModule2D, ChannelAttentionModule3D
+from .attention_pooling import AttentionPooling1D, AttentionPooling2D, AttentionPooling3D
