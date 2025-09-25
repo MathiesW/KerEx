@@ -3,8 +3,8 @@ from keras import layers
 from keras.src import ops
 
 
-@saving.register_keras_serializable(package="Kerex.Blocks.Attention", name="MultiHeadAttention")
-class MultiHeadAttention(layers.MultiHeadAttention):
+@saving.register_keras_serializable(package="Kerex.Blocks.Attention", name="PrefixMultiHeadAttention")
+class PrefixMultiHeadAttention(layers.MultiHeadAttention):
     """
     
     Parameters
@@ -57,8 +57,8 @@ class MultiHeadAttention(layers.MultiHeadAttention):
         key_mask=None,
         attention_mask=None,
         use_causal_mask=False,
-        prefix: int = 0,
-        prediction_step: int = 0
+        prefix=0,
+        prediction_step=0
     ):
         """
         Computes the attention mask, using the Keras masks of the inputs.
@@ -125,7 +125,7 @@ class MultiHeadAttention(layers.MultiHeadAttention):
             )
         return attention_mask
 
-    def _compute_causal_mask(self, query, value=None, prefix: int = 0, prediction_step: int = 0):
+    def _compute_causal_mask(self, query, value=None, prefix=0, prediction_step=0):
         """
         Computes a causal mask (e.g., for masked self-attention layers).
 
@@ -297,7 +297,7 @@ class BaseAttention(layers.Layer):
         ):
         super().__init__()
 
-        self.mha = MultiHeadAttention(num_heads, key_dim, value_dim, dropout, use_bias, output_shape, attention_axes, kernel_initializer, bias_initializer, kernel_regularizer, bias_regularizer, activity_regularizer, kernel_constraint, bias_constraint, seed, **kwargs)
+        self.mha = layers.MultiHeadAttention(num_heads, key_dim, value_dim, dropout, use_bias, output_shape, attention_axes, kernel_initializer, bias_initializer, kernel_regularizer, bias_regularizer, activity_regularizer, kernel_constraint, bias_constraint, seed, **kwargs)
         self.layernorm = layers.LayerNormalization()
         self.add = layers.Add()
 
