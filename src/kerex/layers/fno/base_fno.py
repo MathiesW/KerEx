@@ -8,6 +8,22 @@ from ...layers.wrapper import Residual
 from importlib import import_module
 
 
+@saving.register_keras_serializable(package="Kerex.layers.FNO", name="FNOInitializer")
+class FNOInitializer(initializers.VarianceScaling):
+    def __init__(self, seed=None):
+        super().__init__(
+            scale=0.5,
+            mode="fan_avg",
+            distribution="truncated_normal",
+            seed=seed
+        )
+
+    def get_config(self):
+        return {
+            "seed": saving.serialize_keras_object(self._init_seed)
+        }
+
+
 class BaseFNO(layers.Layer):
     """
     Base FNO layer, cf. https://arxiv.org/abs/2010.08895
@@ -88,7 +104,7 @@ class BaseFNO(layers.Layer):
         merge_layer="add",
         data_format=None,
         use_bias=True,
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
+        kernel_initializer=FNOInitializer(),
         bias_initializer="zeros",
         kernel_constraint=None,
         bias_constraint=None,

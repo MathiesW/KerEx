@@ -2,6 +2,7 @@ from keras import models
 from keras import regularizers, initializers, constraints
 from keras import saving
 from ...ops.helper import _IterableVars
+from ...layers.fno.base_fno import FNOInitializer
 from importlib import import_module
 
 
@@ -79,7 +80,7 @@ class BaseNeuralOperator(models.Model, _IterableVars):
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
+        kernel_initializer=FNOInitializer(),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,

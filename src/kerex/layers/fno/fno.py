@@ -1,6 +1,5 @@
 from keras import saving
-from keras import initializers
-from .base_fno import BaseFNO
+from .base_fno import BaseFNO, FNOInitializer
 
 
 @saving.register_keras_serializable(package="Kerex.Layers.FNO", name="FNO1D")
@@ -81,7 +80,7 @@ class FNO1D(BaseFNO):
         merge_layer="add", 
         data_format=None, 
         use_bias=True, 
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)), 
+        kernel_initializer=FNOInitializer(), 
         bias_initializer="zeros", 
         kernel_constraint=None, 
         bias_constraint=None, 
@@ -187,7 +186,7 @@ class FNO2D(BaseFNO):
         merge_layer="add", 
         data_format=None, 
         use_bias=True, 
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)), 
+        kernel_initializer=FNOInitializer(), 
         bias_initializer="zeros", 
         kernel_constraint=None, 
         bias_constraint=None, 
@@ -293,7 +292,7 @@ class FNO3D(BaseFNO):
         merge_layer="add", 
         data_format=None, 
         use_bias=True, 
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)), 
+        kernel_initializer=FNOInitializer(), 
         bias_initializer="zeros", 
         kernel_constraint=None, 
         bias_constraint=None, 

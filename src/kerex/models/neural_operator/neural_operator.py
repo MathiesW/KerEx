@@ -1,6 +1,6 @@
 from keras import saving
 from keras import initializers
-from .base_neural_operator import BaseNeuralOperator
+from .base_neural_operator import BaseNeuralOperator, FNOInitializer
 
 
 @saving.register_keras_serializable(package="Kerex.Models.NeuralOperator", name="NeuralOperator1D")
@@ -75,7 +75,7 @@ class NeuralOperator1D(BaseNeuralOperator):
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
+        kernel_initializer=FNOInitializer(),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,
@@ -177,7 +177,7 @@ class NeuralOperator2D(BaseNeuralOperator):
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
+        kernel_initializer=FNOInitializer(),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,
@@ -279,7 +279,7 @@ class NeuralOperator3D(BaseNeuralOperator):
         merge_layer="add",
         activation="gelu",
         use_bias=True,
-        kernel_initializer=("glorot_normal", initializers.RandomNormal(stddev=1e-3)),
+        kernel_initializer=FNOInitializer(),
         bias_initializer="zeros",
         kernel_regularizer=None,
         bias_regularizer=None,
