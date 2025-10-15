@@ -21,7 +21,7 @@ class AttentionPooling1D(BaseAttentionPooling):
         Defaults to `True`.
     kernel_initializer : str | keras.initializer.Initializer, optional
         Initializer for real- and imaginary weights.
-        Defaults to `"glorot_uniform"`.
+        Defaults to `"orthogonal"`.
     kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
@@ -47,7 +47,7 @@ class AttentionPooling1D(BaseAttentionPooling):
             num_heads=4, 
             flatten=True, 
             data_format=None, 
-            kernel_initializer="glorot_uniform", 
+            kernel_initializer="orthogonal", 
             kernel_constraint=None, 
             kernel_regularizer=None, 
             name=None, 
@@ -86,7 +86,7 @@ class AttentionPooling2D(BaseAttentionPooling):
         Defaults to `True`.
     kernel_initializer : str | keras.initializer.Initializer, optional
         Initializer for real- and imaginary weights.
-        Defaults to `"glorot_uniform"`.
+        Defaults to `"orthogonal"`.
     kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
@@ -112,7 +112,7 @@ class AttentionPooling2D(BaseAttentionPooling):
             num_heads=4, 
             flatten=True, 
             data_format=None, 
-            kernel_initializer="glorot_uniform", 
+            kernel_initializer="orthogonal", 
             kernel_constraint=None, 
             kernel_regularizer=None, 
             name=None, 
@@ -151,7 +151,7 @@ class AttentionPooling3D(BaseAttentionPooling):
         Defaults to `True`.
     kernel_initializer : str | keras.initializer.Initializer, optional
         Initializer for real- and imaginary weights.
-        Defaults to `"glorot_uniform"`.
+        Defaults to `"orthogonal"`.
     kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
@@ -177,7 +177,7 @@ class AttentionPooling3D(BaseAttentionPooling):
             num_heads=4, 
             flatten=True, 
             data_format=None, 
-            kernel_initializer="glorot_uniform", 
+            kernel_initializer="orthogonal", 
             kernel_constraint=None, 
             kernel_regularizer=None, 
             name=None, 

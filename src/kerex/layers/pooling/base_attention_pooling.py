@@ -27,7 +27,7 @@ class BaseAttentionPooling(Layer):
         Defaults to `True`.
     kernel_initializer : str | keras.initializer.Initializer, optional
         Initializer for real- and imaginary weights.
-        Defaults to `"glorot_uniform"`.
+        Defaults to `"orthogonal"`.
     kernel_regularizer : str | keras.regularizers.Regularizer, optional
         Kernel regularizer.
         Defaults to `None`.
@@ -54,7 +54,7 @@ class BaseAttentionPooling(Layer):
             num_heads=4,
             flatten=True,
             data_format=None,
-            kernel_initializer="glorot_uniform",
+            kernel_initializer="orthogonal",
             kernel_constraint=None,
             kernel_regularizer=None,
             name=None, 
