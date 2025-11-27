@@ -9,6 +9,7 @@ from ...ops.helper import _IterableVars
 from ...ops import get_layer
 from importlib import import_module
 from keras.src.backend import standardize_data_format
+from keras.src.utils.argument_validation import standardize_tuple
 
 
 class BaseDecoder(layers.Layer, _IterableVars):
@@ -366,7 +367,6 @@ class BaseDecoder(layers.Layer, _IterableVars):
         return cls(**config)
 
 
-
 # BaseDecoder with smooth upsampling
 class BaseSmoothDecoder(BaseDecoder):
     """
@@ -401,6 +401,10 @@ class BaseSmoothDecoder(BaseDecoder):
     upsampling_filters : int, optional
         Number of filters for the upsampling operation.
         If `None`, this parameter is set to the last entry of `filters`.
+        Defaults to `None`.
+    upsampling_kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional upsampling layer.
+        If `None`, this is set to `kernel_size`.
         Defaults to `None`.
     activation : str | keras.activations.Activation | keras.layers.Layer, optional
         Activation for the convolutional forward sub-model.
@@ -531,44 +535,142 @@ class BaseSmoothDecoder(BaseDecoder):
         })
         
         return config
-    
-    @classmethod
-    def from_config(cls, config):
-        """
-        Necessary for Keras deserialization
 
-        Parameters
-        ----------
-        cls : BaseDecoder
-            The `BaseDecoder` class.
-        config : dict
-            Dictionary with the layer configuration.
+# BaseDecoder with FFT upsampling
+class BaseFourierDecoder(BaseDecoder):
+    """
+    Base class of convolutional decoder block
 
-        Returns
-        -------
-        cls : BaseDecoder
-            Instance of `BaseDecoder` from `config`.
-        """
+    Use to subclass 1-D, 2-D, and 3-D Decoder
 
-        # get configs of keras objects
-        merge_layer_cfg = config.pop("merge_layer")
-        activation_cfg = config.pop("activation")
-        kernel_initializer_cfg = config.pop("kernel_initializer")
-        bias_initializer_cfg = config.pop("bias_initializer")
-        kernel_regularizer_cfg = config.pop("kernel_regularizer")
-        bias_regularizer_cfg = config.pop("bias_regularizer")
-        kernel_constraint_cfg = config.pop("kernel_constraint")
-        bias_constraint_cfg = config.pop("bias_constraint")
+    Parameters
+    ----------
+    rank : int {1, 2, 3}
+        Rank of `BaseEncoder`. Must be within {1, 2, 3}.
+    filters : int | list | tuple
+        Number of filters for the convolutional forward sub-model.
+    kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for the convolutional forward sub-model.
+        Defaults to 1.
+    padding : str, optional
+        Padding that is applied to maintain deterministic data shapes.
+        Defaults to `"same"`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `"channels_last"`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rate for the convolutional forward sub-model.
+        Defaults to 1.
+    groups : int | list | tuple, optional
+        Number of groups rate for the convolutional forward sub-model.
+        Defaults to 1.
+    scaling_factor : int | list | tuple, optional
+        Factor for scaling for upsampling.
+        Can be a list or tuple with individual values for different feature dimensions.
+        Defaults to 2.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Activation for the convolutional forward sub-model.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from the second input.
+        Defaults to `"concatenate"`.
+    use_bias : bool, optional
+        Whether to use bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the layer.
+        If `None`, `name` is automatically inherited from the class name `"BaseDecoder"`.
+        Defaults to `None`.
+    **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
 
-        config.update({
-            "merge_layer": saving.deserialize_keras_object(merge_layer_cfg),
-            "activation": saving.deserialize_keras_object(activation_cfg),
-            "kernel_initializer": initializers.deserialize(kernel_initializer_cfg),
-            "bias_initializer": initializers.deserialize(bias_initializer_cfg),
-            "kernel_regularizer": regularizers.deserialize(kernel_regularizer_cfg),
-            "bias_regularizer": regularizers.deserialize(bias_regularizer_cfg),
-            "kernel_constraint": constraints.deserialize(kernel_constraint_cfg),
-            "bias_constraint": constraints.deserialize(bias_constraint_cfg)
-        })
+    Raises
+    ------
+    TypeError
+        If `merge_layer` is not valid Keras merge layer, cf. https://keras.io/api/layers/merging_layers/
+        
+    """
 
-        return cls(**config)
+    def __init__(
+            self,
+            rank,
+            filters,
+            kernel_size=5,
+            strides=1,
+            padding="same",
+            data_format="channels_last",
+            dilation_rate=1,
+            groups=1,
+            scaling_factor=2,
+            activation="relu",
+            use_bias=True,
+            merge_layer="concatenate",
+            kernel_initializer="he_normal",
+            bias_initializer="zeros",
+            kernel_regularizer=None,
+            bias_regularizer=None,
+            kernel_constraint=None,
+            bias_constraint=None,
+            name=None, 
+            **kwargs
+        ):
+        super().__init__(
+            rank=rank,
+            filters=filters,
+            kernel_size=kernel_size,
+            strides=strides,
+            padding=padding,
+            data_format=data_format,
+            dilation_rate=dilation_rate,
+            groups=groups,
+            activation=activation,
+            use_bias=use_bias,
+            merge_layer=merge_layer,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer,
+            kernel_regularizer=kernel_regularizer,
+            bias_regularizer=bias_regularizer,
+            kernel_constraint=kernel_constraint,
+            bias_constraint=bias_constraint,
+            name=name,
+            **kwargs
+        )
+
+        # target size depends on input shape and scaling factor, so load only base layer heres
+        self.scaling_factor = standardize_tuple(scaling_factor, n=self.rank, allow_zero=False, name="scaling_factor")
+        self.upsampling = getattr(import_module(name="...layers.reshape", package=__package__), f"FFTUpSampling{self.rank}D")
+
+    def build(self, input_shape, input_shape_skip=None):
+        # initialize layer
+        target_size = list(input_shape).copy()
+        target_size.pop(0)  # remove patch dimension
+        target_size.pop(-1 if self.data_format == "channels_last" else 0)
+
+        target_size = tuple([s * f for s, f in zip(target_size, self.scaling_factor)])
+        self.upsampling = self.upsampling(
+            target_size=target_size,
+            data_format=self.data_format
+        )
+
+        super().build(input_shape=input_shape, input_shape_skip=input_shape_skip)

@@ -898,6 +898,8 @@ class BaseSmoothUnet(BaseSmoothFCN):
 
     Downsampling is realized using a strided convolution as proposed by [Springenberger et al.](https://arxiv.org/abs/1412.6806)
 
+    Upsampling is realized using image umsampling followed by a convolution, which reduces the checkerboard effect in the upscaled information [Odena et al.](https://distill.pub/2016/deconv-checkerboard/).
+
     """
     def __init__(self,
         rank,
@@ -922,6 +924,7 @@ class BaseSmoothUnet(BaseSmoothFCN):
         name=None,
         **kwargs
     ):
+        kwargs.pop("use_skip_connection", None)
         super().__init__(
             rank=rank,
             filters=filters,
@@ -946,3 +949,375 @@ class BaseSmoothUnet(BaseSmoothFCN):
             name=name,
             **kwargs
         )
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config.pop("use_skip_connection", None)  # This should always be `True` for UNet
+
+        return config
+
+
+### MODELS THAT USE FOURIER UPSAMPLING LAYER ###
+class BaseFourierFCN(BaseFCN):
+    """
+    Base class of FullyConvolutionalNetwork (FCN)
+
+    Convolutional autoencoder *without* skip-connections
+
+    Parameters
+    ----------
+    rank : int {1, 2, 3}
+        Rank of `BaseFCN`. Must be within {1, 2, 3}.
+    filters : int | list | tuple
+        Number of filters. 
+        The model will be build symmetrically, meaning that only the number of encoder filters is defined,
+        and the decoder will mirror it.
+    kernel_size : int | list | tuple, optional
+        Kernel size for encoder blocks. 
+        An `int` results in a global `kernel_size`, a `list` allows to define the `kernel_size` per layer.
+        Decoder blocks will mirror the `kernel_size` of the encoder blocks.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for encoder blocks. 
+        An `int` results in a global value for `strides`, a `list` allows to define the `strides` per layer.
+        Decoder blocks will mirror the `strides` of the encoder blocks.
+        Defaults to 1.
+    padding : str, optional
+        Padding for encoder blocks. 
+        Decoder blocks will mirror the `padding` of the encoder blocks.
+        If `rank=1`, `padding` may be either `"same"` or `"causal"`, `rank>1` enforces `padding="same"`
+        to maintain deterministic shapes throughout the model.
+        Defaults to `"same"`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `"channels_last"`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rates for encoder blocks. 
+        An `int` results in a global value for `dilation_rate`, a `list` allows to define the `dilation_rate` per layer.
+        Decoder blocks will mirror the `dilation_rate` of the encoder blocks.
+        Defaults to 1.
+    groups : int, optional
+        Number of convolutional groups for encoder blocks. 
+        An `int` results in a global value for `groups`, a `list` allows to define the `groups` per layer.
+        Decoder blocks will mirror the `groups` of the encoder blocks.
+        Defaults to 1.
+    scaling_factor : int | list | tuple, optional
+        Factor for scaling for upsampling.
+        Can be a list or tuple with individual values for different feature dimensions.
+        A list is interpreted as scaling factors for each level of the model.
+        Hence, `scaling_factor=[2, 4, 8]` will result in different upscaling per level.
+        In this case, `len(scaling_factor)` has to match `len(filters)`.
+        Defaults to 2.
+    use_skip_connection : bool | list, optional
+        Whether to use skip connections (basically transform FCN to a Unet).
+        Can be defined per layer, i.e., 
+        `use_skip_connection=[True, False, False]` results in a skip connection on the highest level only.
+        Defaults to `False`.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Global activation function.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    use_bias : bool, optional
+        If `True`, all layers use a bias.
+        Defaults to `True`.
+    bottleneck : keras.layers.Layer | keras.models.Model, optional
+        An optional `keras.layer.Layer` or `keras.models.Model` that is placed in the bottleneck of the model.
+        Defaults to `None`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from skip connections.
+        For this parameter to have an impact, there has to be at least one skip connection in the model.
+        Defaults to `"concatenate"`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the model.
+        If `None`, `name` is automatically inherited from the class name `"BaseFCN"`.
+        Defaults to `None`.
+
+    Notes
+    -----
+    The `filters` argument steers the depth of the model and the layout of the encoder- and decoder blocks on each level:
+    A list containing tuples results in multiple convolutions on the respective level, e.g.,
+    `filters=[(8, 8), 16, 32]` will return a model with a depth of 3, 
+    where the first encoder (and last decoder) block has two consecutive convolutions with `filters=8`,
+    and the remaining two levels have only a single convolution with `filters=16` and `filters=32`, respectively.
+
+    Downsampling is realized using a strided convolution as proposed by [Springenberger et al.](https://arxiv.org/abs/1412.6806)
+
+    Upsampling is realized using padding in Fourier space.
+
+    """
+
+    def __init__(
+        self,
+        rank,
+        filters=[8, 16, 32],
+        kernel_size=5,
+        strides=1,
+        padding="same",
+        data_format="channels_last",
+        dilation_rate=1,
+        groups=1,
+        scaling_factor=2,
+        use_skip_connection=False,
+        activation="relu",
+        use_bias=True,
+        bottleneck=None,
+        merge_layer="concatenate",
+        kernel_initializer="he_normal",
+        bias_initializer="zeros",
+        kernel_regularizer=None,
+        bias_regularizer=None,
+        kernel_constraint=None,
+        bias_constraint=None,
+        name=None,
+        **kwargs
+    ):
+        self.set_vars(filters=filters, scaling_factor=scaling_factor)   # CAN have different scaling factor for all layers!
+
+        super().__init__(
+            rank=rank,
+            filters=filters,
+            kernel_size=kernel_size,
+            strides=strides,
+            padding=padding,
+            data_format=data_format,
+            dilation_rate=dilation_rate,
+            groups=groups,
+            use_skip_connection=use_skip_connection,
+            activation=activation,
+            use_bias=use_bias,
+            bottleneck=bottleneck,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer,
+            kernel_regularizer=kernel_regularizer,
+            bias_regularizer=bias_regularizer,
+            kernel_constraint=kernel_constraint,
+            bias_constraint=bias_constraint,
+            name=name,
+            merge_layer=merge_layer,
+            **kwargs
+        )
+
+
+    def set_decoder_layers(self):
+        self.decoder_layers = [
+            getattr(import_module(name="...blocks.autoencoder", package=__package__), f"FourierDecoder{self.rank}D")(
+                filters=f,
+                kernel_size=k,
+                strides=s,
+                padding=p,
+                data_format=self.data_format,
+                dilation_rate=d,
+                groups=g,
+                scaling_factor=sf,
+                merge_layer=self.merge_layer, 
+                activation=self.activation,
+                use_bias=self.use_bias,
+                kernel_initializer=self.kernel_initializer,
+                bias_initializer=self.bias_initializer,
+                kernel_regularizer=self.kernel_regularizer,
+                bias_regularizer=self.bias_regularizer,
+                kernel_constraint=self.kernel_constraint,
+                bias_constraint=self.bias_constraint,
+                activity_regularizer=self.activity_regularizer,
+                name=f"Decoder_{len(self.filters) - i - 1}"
+            ) for i, (f, k, s, p, d, g, sf) in enumerate(
+                zip(
+                    list(reversed(self.filters)), 
+                    list(reversed(self.kernel_size)),
+                    list(reversed(self.strides)),
+                    list(reversed(self.padding)),
+                    list(reversed(self.dilation_rate)),
+                    list(reversed(self.groups)),
+                    list(self.scaling_factor)
+                )
+            )
+        ]
+
+    def get_config(self):
+        """
+        Necessary for Keras serialization
+
+        Returns
+        -------
+        config : dict
+            Dictionary with the layer configuration.
+            
+        """
+
+        config = super().get_config()
+        config.update({"scaling_factor": self.scaling_factor})
+
+        return config
+    
+
+class BaseFourierUnet(BaseFourierFCN):
+    """
+    Base class of Unet, cf. [Ronneberger et al.](https://arxiv.org/abs/1505.04597)
+
+    Convolutional autoencoder *with* skip-connections
+
+    Upsampling is performed in Fourier space.
+
+    Parameters
+    ----------
+    rank : int {1, 2, 3}
+        Rank of `BaseUnet`. Must be within {1, 2, 3}.
+    filters : int | list | tuple
+        Number of filters. 
+        The model will be build symmetrically, meaning that only the number of encoder filters is defined,
+        and the decoder will mirror it.
+    kernel_size : int | list | tuple, optional
+        Kernel size for encoder blocks. 
+        An `int` results in a global `kernel_size`, a `list` allows to define the `kernel_size` per layer.
+        Decoder blocks will mirror the `kernel_size` of the encoder blocks.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for encoder blocks. 
+        An `int` results in a global value for `strides`, a `list` allows to define the `strides` per layer.
+        Decoder blocks will mirror the `strides` of the encoder blocks.
+        Defaults to 1.
+    padding : str, optional
+        Padding for all convolutional layers in the model.
+        If `rank=1`, `padding` may be either `"same"` or `"causal"`, `rank>1` enforces `padding="same"`
+        to maintain deterministic shapes throughout the model.
+        Defaults to `"same"`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `"channels_last"`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rates for encoder blocks. 
+        An `int` results in a global value for `dilation_rate`, a `list` allows to define the `dilation_rate` per layer.
+        Decoder blocks will mirror the `dilation_rate` of the encoder blocks.
+        Defaults to 1.
+    groups : int, optional
+        Number of convolutional groups for encoder blocks. 
+        An `int` results in a global value for `groups`, a `list` allows to define the `groups` per layer.
+        Decoder blocks will mirror the `groups` of the encoder blocks.
+        Defaults to 1.
+    scaling_factor : int, optional
+        Factor for scaling for upsampling.
+        Defaults to 2.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Global activation function.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    use_bias : bool, optional
+        If `True`, all layers use a bias.
+        Defaults to `True`.
+    bottleneck : keras.layers.Layer | keras.models.Model, optional
+        An optional `keras.layer.Layer` or `keras.models.Model` that is placed in the bottleneck of the model.
+        Defaults to `None`.
+    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the information from skip connections.
+        Defaults to `"concatenate"`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the model.
+        If `None`, `name` is automatically inherited from the class name `"BaseUnet"`.
+        Defaults to `None`.
+
+    Notes
+    -----
+    The `filters` argument steers the depth of the model and the layout of the encoder- and decoder blocks on each level:
+    A list containing tuples results in multiple convolutions on the respective level, e.g.,
+    `filters=[(8, 8), 16, 32]` will return a model with a depth of 3, 
+    where the first encoder (and last decoder) block has two consecutive convolutions with `filters=8`,
+    and the remaining two levels have only a single convolution with `filters=16` and `filters=32`, respectively.
+
+    Downsampling is realized using a strided convolution as proposed by [Springenberger et al.](https://arxiv.org/abs/1412.6806)
+    
+    Upsampling is realized using padding in Fourier space.
+
+    """
+    def __init__(self,
+        rank,
+        filters=[8, 16, 32],
+        kernel_size=5,
+        strides=1,
+        padding="same",
+        data_format="channels_last",
+        dilation_rate=1, 
+        groups=1, 
+        activation="relu",
+        use_bias=True,
+        bottleneck=None,
+        merge_layer="concatenate",
+        kernel_initializer="he_normal",
+        bias_initializer="zeros",
+        kernel_regularizer=None,
+        bias_regularizer=None,
+        kernel_constraint=None,
+        bias_constraint=None,
+        name=None,
+        **kwargs
+    ):
+        kwargs.pop("use_skip_connection", None)
+        kwargs.pop("scaling_factor", None)
+        
+        super().__init__(
+            rank=rank,
+            filters=filters,
+            kernel_size=kernel_size,
+            strides=strides,
+            padding=padding,
+            data_format=data_format,
+            dilation_rate=dilation_rate,
+            groups=groups,
+            scaling_factor=2,
+            use_skip_connection=True,
+            activation=activation,
+            use_bias=use_bias,
+            bottleneck=bottleneck,
+            merge_layer=merge_layer,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer,
+            kernel_regularizer=kernel_regularizer,
+            bias_regularizer=bias_regularizer,
+            kernel_constraint=kernel_constraint,
+            bias_constraint=bias_constraint,
+            name=name,
+            **kwargs
+        )
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config.pop("use_skip_connection", None)     # `use_skip_connection` should always be `True` for UNet
+        config.pop("scaling_factor", None)          # `scaling_factor` should always be 2 for UNet
+
+        return config
+    
