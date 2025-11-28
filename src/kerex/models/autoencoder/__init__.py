@@ -1,2 +1,2 @@
-from .fully_convolutional_network import FCN1D, FCN2D, FCN3D
-from .unet import Unet1D, Unet2D, Unet3D, SmoothUnet1D, SmoothUnet2D, SmoothUnet3D
+from .fully_convolutional_network import FCN1D, FCN2D, FCN3D, SmoothFCN1D, SmoothFCN2D, SmoothFCN3D, FourierFCN1D, FourierFCN2D, FourierFCN3D
+from .unet import Unet1D, Unet2D, Unet3D, SmoothUnet1D, SmoothUnet2D, SmoothUnet3D, FourierUnet1D, FourierUnet2D, FourierUnet3D
