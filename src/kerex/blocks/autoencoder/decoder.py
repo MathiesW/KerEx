@@ -37,8 +37,9 @@ class Decoder1D(BaseDecoder):
         Activation for the convolutional forward sub-model.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"relu"`.
-    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
         Defaults to `"concatenate"`.
     use_bias : bool, optional
         Whether to use bias.
@@ -148,8 +149,9 @@ class Decoder2D(BaseDecoder):
         Activation for the convolutional forward sub-model.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"relu"`.
-    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
         Defaults to `"concatenate"`.
     use_bias : bool, optional
         Whether to use bias.
@@ -256,8 +258,9 @@ class Decoder3D(BaseDecoder):
         Activation for the convolutional forward sub-model.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"relu"`.
-    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
         Defaults to `"concatenate"`.
     use_bias : bool, optional
         Whether to use bias.
@@ -334,6 +337,73 @@ class Decoder3D(BaseDecoder):
 ### DECODER USING SMOOTH UPSAMPLING ###
 @saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="SmoothDecoder1D")
 class SmoothDecoder1D(BaseSmoothDecoder):
+    """
+    1-D convolutional decoder block
+    To reduce the checkerboard-effect, the upsampling is realized using a stack of image-upsampling and a convolution, cf. [Odena et al.](https://distill.pub/2016/deconv-checkerboard/)
+
+    Parameters
+    ----------
+    filters : int | list | tuple
+        Number of filters for the convolutional forward sub-model.
+    kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for the convolutional forward sub-model.
+        Defaults to 1.
+    padding : str, optional {`"same"`, `"causal"`}
+        Padding that is applied to maintain deterministic data shapes.
+        Defaults to `"same"`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `None`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rate for the convolutional forward sub-model.
+        Defaults to 1.
+    groups : int | list | tuple, optional
+        Number of groups rate for the convolutional forward sub-model.
+        Defaults to 1.
+    upsampling_filters : int, optional
+        Number of filters for the upsampling operation.
+        If `None`, this parameter is set to the last entry of `filters`.
+        Defaults to `None`.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Activation for the convolutional forward sub-model.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
+        Defaults to `"concatenate"`.
+    use_bias : bool, optional
+        Whether to use bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the layer.
+        If `None`, `name` is automatically inherited from the class name `"Decoder1D"`.
+        Defaults to `None`.
+    **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
+
+    """
+
     def __init__(
             self, 
             filters, 
@@ -382,6 +452,73 @@ class SmoothDecoder1D(BaseSmoothDecoder):
 
 @saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="SmoothDecoder2D")
 class SmoothDecoder2D(BaseSmoothDecoder):
+    """
+    2-D convolutional decoder block
+    To reduce the checkerboard-effect, the upsampling is realized using a stack of image-upsampling and a convolution, cf. [Odena et al.](https://distill.pub/2016/deconv-checkerboard/)
+
+    Parameters
+    ----------
+    filters : int | list | tuple
+        Number of filters for the convolutional forward sub-model.
+    kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for the convolutional forward sub-model.
+        Defaults to 1.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `None`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rate for the convolutional forward sub-model.
+        Defaults to 1.
+    groups : int | list | tuple, optional
+        Number of groups rate for the convolutional forward sub-model.
+        Defaults to 1.
+    upsampling_filters : int, optional
+        Number of filters for the upsampling operation.
+        If `None`, this parameter is set to the last entry of `filters`.
+        Defaults to `None`.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Activation for the convolutional forward sub-model.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
+        Defaults to `"concatenate"`.
+    interpolation : str, optional {`"nearest"`, `"bicubic"`, `"bilinear"`, `"lanczos3"`, `"lanczos5"`}
+        Interpolation to use in `SmoothUpSampling2D` layer.
+        Defaults to `"nearest"`.
+    use_bias : bool, optional
+        Whether to use bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the layer.
+        If `None`, `name` is automatically inherited from the class name `"Decoder2D"`.
+        Defaults to `None`.
+    **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
+
+    """
+
     def __init__(
             self, 
             filters, 
@@ -432,6 +569,70 @@ class SmoothDecoder2D(BaseSmoothDecoder):
 
 @saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="SmoothDecoder3D")
 class SmoothDecoder3D(BaseSmoothDecoder):
+    """
+    3-D convolutional decoder block
+    To reduce the checkerboard-effect, the upsampling is realized using a stack of image-upsampling and a convolution, cf. [Odena et al.](https://distill.pub/2016/deconv-checkerboard/)
+
+    Parameters
+    ----------
+    filters : int | list | tuple
+        Number of filters for the convolutional forward sub-model.
+    kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for the convolutional forward sub-model.
+        Defaults to 1.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `None`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rate for the convolutional forward sub-model.
+        Defaults to 1.
+    groups : int | list | tuple, optional
+        Number of groups rate for the convolutional forward sub-model.
+        Defaults to 1.
+    upsampling_filters : int, optional
+        Number of filters for the upsampling operation.
+        If `None`, this parameter is set to the last entry of `filters`.
+        Defaults to `None`.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Activation for the convolutional forward sub-model.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
+        Defaults to `"concatenate"`.
+    use_bias : bool, optional
+        Whether to use bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the layer.
+        If `None`, `name` is automatically inherited from the class name `"Decoder3D"`.
+        Defaults to `None`.
+    **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
+
+    """
+
     def __init__(
             self, 
             filters, 
@@ -480,6 +681,69 @@ class SmoothDecoder3D(BaseSmoothDecoder):
 
 @saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="FourierDecoder1D")
 class FourierDecoder1D(BaseFourierDecoder):
+    """
+    1-D convolutional decoder block
+    The upsampling is realized using zero-padding in Fourier space
+
+    Parameters
+    ----------
+    filters : int | list | tuple
+        Number of filters for the convolutional forward sub-model.
+    kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for the convolutional forward sub-model.
+        Defaults to 1.
+    padding : str, optional {`"same"`, `"causal"`}
+        Padding that is applied to maintain deterministic data shapes.
+        Defaults to `"same"`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `None`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rate for the convolutional forward sub-model.
+        Defaults to 1.
+    groups : int | list | tuple, optional
+        Number of groups rate for the convolutional forward sub-model.
+        Defaults to 1.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Activation for the convolutional forward sub-model.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
+        Defaults to `"concatenate"`.
+    use_bias : bool, optional
+        Whether to use bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the layer.
+        If `None`, `name` is automatically inherited from the class name `"Decoder1D"`.
+        Defaults to `None`.
+    **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
+
+    """
+
     def __init__(
             self, 
             filters, 
@@ -528,6 +792,69 @@ class FourierDecoder1D(BaseFourierDecoder):
 
 @saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="FourierDecoder2D")
 class FourierDecoder2D(BaseFourierDecoder):
+    """
+    2-D convolutional decoder block
+    The upsampling is realized using zero-padding in Fourier space
+
+    Parameters
+    ----------
+    filters : int | list | tuple
+        Number of filters for the convolutional forward sub-model.
+    kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for the convolutional forward sub-model.
+        Defaults to 1.
+    padding : str, optional {`"same"`, `"causal"`}
+        Padding that is applied to maintain deterministic data shapes.
+        Defaults to `"same"`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `None`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rate for the convolutional forward sub-model.
+        Defaults to 1.
+    groups : int | list | tuple, optional
+        Number of groups rate for the convolutional forward sub-model.
+        Defaults to 1.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Activation for the convolutional forward sub-model.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
+        Defaults to `"concatenate"`.
+    use_bias : bool, optional
+        Whether to use bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the layer.
+        If `None`, `name` is automatically inherited from the class name `"Decoder1D"`.
+        Defaults to `None`.
+    **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
+
+    """
+
     def __init__(
             self, 
             filters, 
@@ -576,6 +903,69 @@ class FourierDecoder2D(BaseFourierDecoder):
 
 @saving.register_keras_serializable(package="Kerex.Blocks.Autoencoder", name="FourierDecoder3D")
 class FourierDecoder3D(BaseFourierDecoder):
+    """
+    3-D convolutional decoder block
+    The upsampling is realized using zero-padding in Fourier space
+
+    Parameters
+    ----------
+    filters : int | list | tuple
+        Number of filters for the convolutional forward sub-model.
+    kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional forward sub-model.
+        Defaults to 5.
+    strides : int | list | tuple, optional
+        Strides for the convolutional forward sub-model.
+        Defaults to 1.
+    padding : str, optional {`"same"`, `"causal"`}
+        Padding that is applied to maintain deterministic data shapes.
+        Defaults to `"same"`.
+    data_format : str, optional {`"channels_first"`, `"channels_last"`}
+        Data format for the convolution operations.
+        Defaults to `None`.
+    dilation_rate : int | list | tuple, optional
+        Dilation rate for the convolutional forward sub-model.
+        Defaults to 1.
+    groups : int | list | tuple, optional
+        Number of groups rate for the convolutional forward sub-model.
+        Defaults to 1.
+    activation : str | keras.activations.Activation | keras.layers.Layer, optional
+        Activation for the convolutional forward sub-model.
+        Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
+        Defaults to `"relu"`.
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+        Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
+        Defaults to `"concatenate"`.
+    use_bias : bool, optional
+        Whether to use bias.
+        Defaults to `True`.
+    kernel_initializer : str | keras.initializers.Initializer, optional
+        Kernel initializer.
+        Defaults to `"he_normal"`.
+    bias_initializer : str | keras.initializers.Initializer, optional
+        Bias initializer.
+        Defaults to `"zeros"`.
+    kernel_regularizer : str | keras.regularizers.Regularizer, optional
+        Kernel regularizer.
+        Defaults to `None`.
+    bias_regularizer : str | keras.regularizers.Regularizer, optional
+        Bias regularizer.
+        Defaults to `None`.
+    kernel_constraint : str | keras.constraints.Constraint, optional
+        Kernel constraint.
+        Defaults to `None`.
+    bias_constraint : str | keras.constraints.Constraint, optional
+        Bias constraint.
+        Defaults to `None`.
+    name : str, optional
+        Name of the layer.
+        If `None`, `name` is automatically inherited from the class name `"Decoder1D"`.
+        Defaults to `None`.
+    **kwargs : Additional keyword arguments for the `keras.layers.Layer` super-class.
+
+    """
+
     def __init__(
             self, 
             filters, 
@@ -620,3 +1010,4 @@ class FourierDecoder3D(BaseFourierDecoder):
             name=name,
             **kwargs
         )
+        

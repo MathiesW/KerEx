@@ -50,8 +50,9 @@ class BaseDecoder(layers.Layer, _IterableVars):
         Activation for the convolutional forward sub-model.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"relu"`.
-    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
         Defaults to `"concatenate"`.
     use_bias : bool, optional
         Whether to use bias.
@@ -171,16 +172,24 @@ class BaseDecoder(layers.Layer, _IterableVars):
         )
 
         # load merge layer
-        try:
-            self.merge_layer = get_layer(merge_layer, axis=-1 if self.data_format == "channels_last" else 1)
-        except TypeError:  # layer does not supply axis argument
-            self.merge_layer = get_layer(merge_layer)
+        if isinstance(merge_layer, dict):
+            self.merge_layer = get_layer(**merge_layer)
+        else:
+            try:
+                self.merge_layer = get_layer(merge_layer, axis=-1 if self.data_format == "channels_last" else 1)
+            except TypeError:  # layer does not supply axis argument
+                self.merge_layer = get_layer(merge_layer)
 
         if not issubclass(type(self.merge_layer), Merge):
             raise TypeError(
                 f"Merge-layer {self.merge_layer} supplied to Wrapper isn't "
                 "a supported merge-layer."
             )
+
+        # define layer sequence. Defaults to `"UMC"`, which means Upsampling -> Merge -> Conv, which is the default in e.g. the Unet
+        # NOTE: this is only possible when the merge layer is `"concatenate"`, all other merge layer require `"UCM"`.
+        # NOTE: merge layer `"concatenate"` would also work with `"UCM"` but this case is not covered here!
+        self.layer_sequence = "UMC" if isinstance(self.merge_layer, layers.Concatenate) else "UCM"
         
     def call(self, inputs, skip=None):
         """
@@ -208,10 +217,16 @@ class BaseDecoder(layers.Layer, _IterableVars):
 
         x_forward = self.upsampling(inputs)
 
-        if skip is not None:
-            x_forward = self.merge_layer((x_forward, skip))
+        if self.layer_sequence == "UMC":
+            if skip is not None:
+                x_forward = self.merge_layer((x_forward, skip))
 
-        x_forward = self.forward_conv(x_forward)
+            x_forward = self.forward_conv(x_forward)
+        else:
+            x_forward = self.forward_conv(x_forward)
+            
+            if skip is not None:
+                x_forward = self.merge_layer((x_forward, skip))
 
         return x_forward
     
@@ -247,19 +262,34 @@ class BaseDecoder(layers.Layer, _IterableVars):
         self.upsampling.build(input_shape=input_shape)
         input_shape = self.upsampling.compute_output_shape(input_shape=input_shape)
 
-        # build merge layer
-        if input_shape_skip is not None:
+        if self.layer_sequence == "UMC":
+            # build merge layer
+            if input_shape_skip is not None:
+                # cache build shape
+                self._build_shapes.update({self.merge_layer.name: {"input_shape": (input_shape, input_shape_skip)}})
+
+                self.merge_layer.build(input_shape=(input_shape, input_shape_skip))
+                input_shape = self.merge_layer.compute_output_shape(input_shape=(input_shape, input_shape_skip))
+
+            # build forward layer and update input_shape
             # cache build shape
-            self._build_shapes.update({self.merge_layer.name: {"input_shape": (input_shape, input_shape_skip)}})
+            self._build_shapes.update({self.forward_conv.name: {"input_shape": input_shape}})
 
-            self.merge_layer.build(input_shape=(input_shape, input_shape_skip))
-            input_shape = self.merge_layer.compute_output_shape(input_shape=(input_shape, input_shape_skip))
+            self.forward_conv.build(input_shape=input_shape)
+        else:
+            # build forward layer and update input_shape
+            # cache build shape
+            self._build_shapes.update({self.forward_conv.name: {"input_shape": input_shape}})
 
-        # build forward layer and update input_shape
-        # cache build shape
-        self._build_shapes.update({self.forward_conv.name: {"input_shape": input_shape}})
+            self.forward_conv.build(input_shape=input_shape)
+            input_shape = self.forward_conv.compute_output_shape(input_shape=input_shape)
 
-        self.forward_conv.build(input_shape=input_shape)
+            # build merge layer
+            if input_shape_skip is not None:
+                # cache build shape
+                self._build_shapes.update({self.merge_layer.name: {"input_shape": (input_shape, input_shape_skip)}})
+
+                self.merge_layer.build(input_shape=(input_shape, input_shape_skip))            
 
         # update built state
         self.built = True
@@ -410,8 +440,9 @@ class BaseSmoothDecoder(BaseDecoder):
         Activation for the convolutional forward sub-model.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"relu"`.
-    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
         Defaults to `"concatenate"`.
     use_bias : bool, optional
         Whether to use bias.
@@ -575,8 +606,9 @@ class BaseFourierDecoder(BaseDecoder):
         Activation for the convolutional forward sub-model.
         Can be either a `str`, a `keras.activations.Activation`, or a `keras.layers.Layer`.
         Defaults to `"relu"`.
-    merge_layer : str | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
+    merge_layer : str | dict | keras.layers.Layer, optional {`"concatenate"`, `"average"`, `"maximum"`, `"minimum"`, `"add"`, `"subtract"`, `"multiply"`, `"dot"`}
         Layer to merge the forward information with the (optional) information from the second input.
+        Can be a dict for more elaborate `merge_layer` like `{"identifier": "AttentionGate", "module": "kerex.layers", "merge_layer": "add"}`.
         Defaults to `"concatenate"`.
     use_bias : bool, optional
         Whether to use bias.
