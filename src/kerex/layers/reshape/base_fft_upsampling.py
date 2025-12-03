@@ -20,9 +20,16 @@ class BaseFFTUpSampling(layers.Layer):
     rank : int
         Rank of the data.
         Determines rank of Fourier transform.
+    size : int | tuple
+        Determines the upsampling factor between the input and output signals.
+        Must be a positive integer or a tuple of positive integers.
+        Defaults to `None`.
     target_size : int | tuple
         Determines the target size of the output signal.
         Can be smaller than initial input size to perform downsampling in Fourier space.
+        This is an optional way to the `size` argument to determine the output size.
+        Only one must be defined, either `size` or `target_size`.
+        Defaults to `None`.
     data_format : str, optional {`"channels_first"`, `"channels_last"`}
         Format of the data.
         If `None`, this is usually `"channels_last"`, check Keras API!
@@ -32,13 +39,21 @@ class BaseFFTUpSampling(layers.Layer):
         If `None`, it is derived from the class name.
         Defaults to `None`.
     **kwargs
+
+    Raises
+    ------
+    ValueError
+        When both `size` and `target_size` are not defined.
+    ValueError
+        When both `size` and `target_size` are defined.
     
     """
 
     def __init__(
         self, 
         rank,
-        target_size,
+        size=None,
+        target_size=None,
         data_format=None,
         name=None, 
         **kwargs
@@ -46,7 +61,20 @@ class BaseFFTUpSampling(layers.Layer):
         super().__init__(name=name, **kwargs)
         self.rank = rank
         
-        self.target_size = standardize_tuple(target_size, n=self.rank, allow_zero=True, name="size")
+        if (size is None) and (target_size is None):
+            raise ValueError(f"Underdetermined layer! Please define either `size` (integer upsampling factor) or `target_size` (explicit size to upsample to).")
+        
+        if (size is not None) and (target_size is not None):
+            raise ValueError(f"Overdetermined layer! Please define either `size` (integer upsampling factor) or `target_size` (explicit size to upsample to), not both!")
+        
+        if size is not None:
+            self.size = standardize_tuple(size, n=self.rank, allow_zero=False, name="size")
+            self.target_size = None
+
+        if target_size is not None:
+            self.size = None
+            self.target_size = standardize_tuple(target_size, n=self.rank, allow_zero=True, name="size")
+
         self.data_format = standardize_data_format(data_format)
 
         # import fft 
@@ -106,12 +134,14 @@ class BaseFFTUpSampling(layers.Layer):
         feature_dims = tuple([input_shape[fa] for fa in feature_axes])
 
         # Parcivals Theorem: constant energy in frequency spectrum. We have to scale output after padding!
-        self.scaling_factor = ops.prod(self.target_size) / ops.prod(feature_dims)
+        # for this, get target size from either `self.target_size` or `self.size`
+        target_size = self.target_size or tuple([s * f for s, f in zip(self.size, feature_dims)])
+        self.scaling_factor = ops.prod(target_size) / ops.prod(feature_dims)
 
         self.pad_width = (
             (0, 0),
             (0, 0), 
-            *[(0, (size // 2 + 1) - (shape // 2 + 1)) if (i == (len(self.target_size) - 1)) else ((size - shape) // 2, (size - shape) // 2) for i, (size, shape) in enumerate(zip(self.target_size, input_shape[(1 if self.data_format == "channels_last" else 2):]))]
+            *[(0, (size // 2 + 1) - (shape // 2 + 1)) if (i == (len(target_size) - 1)) else ((size - shape) // 2, (size - shape) // 2) for i, (size, shape) in enumerate(zip(target_size, input_shape[(1 if self.data_format == "channels_last" else 2):]))]
         )
 
         self.built = True
@@ -220,11 +250,17 @@ class BaseFFTUpSampling(layers.Layer):
     def compute_output_shape(self, input_shape):
         input_shape = list(input_shape)
 
+        # get input shape along feature axes
         feature_axes = list(range(len(input_shape)))
         feature_axes.pop(0)  # batch
         feature_axes.pop(-1 if self.data_format == "channels_last" else 0)  # channel dimension
+        feature_dims = tuple([input_shape[fa] for fa in feature_axes])
 
-        for fa, size in zip(feature_axes, self.target_size):
+        # get target size from either `self.target_size` or `self.size`
+        target_size = self.target_size or tuple([s * f for s, f in zip(self.size, feature_dims)])
+
+        # calculate output shape
+        for fa, size in zip(feature_axes, target_size):
             input_shape[fa] = size
 
         return tuple(input_shape)
@@ -232,6 +268,7 @@ class BaseFFTUpSampling(layers.Layer):
     def get_config(self):
         config = super().get_config()
         config.update({
+            "size": self.size,
             "target_size": self.target_size,
             "data_format": self.data_format
         })
