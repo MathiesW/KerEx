@@ -598,6 +598,14 @@ class BaseFourierDecoder(BaseDecoder):
     groups : int | list | tuple, optional
         Number of groups rate for the convolutional forward sub-model.
         Defaults to 1.
+    upsampling_filters : int, optional
+        Number of filters for the upsampling operation.
+        If `None`, this parameter is set to the last entry of `filters`.
+        Defaults to `None`.
+    upsampling_kernel_size : int | list | tuple, optional
+        Kernel size for the convolutional upsampling layer.
+        If `None`, this is set to `kernel_size`.
+        Defaults to `None`.
     scaling_factor : int | list | tuple, optional
         Factor for scaling for upsampling.
         Can be a list or tuple with individual values for different feature dimensions.
@@ -654,6 +662,8 @@ class BaseFourierDecoder(BaseDecoder):
             data_format="channels_last",
             dilation_rate=1,
             groups=1,
+            upsampling_filters=None,
+            upsampling_kernel_size=None,
             scaling_factor=2,
             activation="relu",
             use_bias=True,
@@ -676,6 +686,7 @@ class BaseFourierDecoder(BaseDecoder):
             data_format=data_format,
             dilation_rate=dilation_rate,
             groups=groups,
+            upsampling_filters=upsampling_filters,
             activation=activation,
             use_bias=use_bias,
             merge_layer=merge_layer,
@@ -689,20 +700,46 @@ class BaseFourierDecoder(BaseDecoder):
             **kwargs
         )
 
+        # overwrite upsampling layer
+        self.upsampling_kernel_size = upsampling_kernel_size or self.kernel_size[0]
+
         # target size depends on input shape and scaling factor, so load only base layer heres
         self.scaling_factor = standardize_tuple(scaling_factor, n=self.rank, allow_zero=False, name="scaling_factor")
-        self.upsampling = getattr(import_module(name="...layers.reshape", package=__package__), f"FFTUpSampling{self.rank}D")
+        self.upsampling = Sequential([
+            getattr(import_module(name="...layers.reshape", package=__package__), f"FFTUpSampling{self.rank}D")(
+                size=self.scaling_factor,
+                data_format=self.data_format
+            ),
+            getattr(import_module(name="...layers.conv", package=__package__), f"Conv{self.rank}D")(
+                filters=self.upsampling_filters,
+                kernel_size=self.upsampling_kernel_size,
+                strides=1,
+                padding="same",
+                data_format=self.data_format,
+                dilation_rate=1,
+                activation=None,
+                use_bias=self.use_bias,
+                kernel_initializer=self.kernel_initializer,
+                bias_initializer=self.bias_initializer,
+                kernel_regularizer=self.kernel_regularizer,
+                bias_regularizer=self.bias_regularizer,
+                activity_regularizer=self.activity_regularizer,
+                kernel_constraint=self.kernel_constraint,
+                bias_constraint=self.bias_constraint
+            )
+        ], name="upsampling")
 
-    def build(self, input_shape, input_shape_skip=None):
-        # initialize layer
-        target_size = list(input_shape).copy()
-        target_size.pop(0)  # remove patch dimension
-        target_size.pop(-1 if self.data_format == "channels_last" else 0)
+    # def build(self, input_shape, input_shape_skip=None):
+        # # initialize layer
+        # target_size = list(input_shape).copy()
+        # target_size.pop(0)  # remove patch dimension
+        # target_size.pop(-1 if self.data_format == "channels_last" else 0)
 
-        target_size = tuple([s * f for s, f in zip(target_size, self.scaling_factor)])
-        self.upsampling = self.upsampling(
-            target_size=target_size,
-            data_format=self.data_format
-        )
+        # target_size = tuple([s * f for s, f in zip(target_size, self.scaling_factor)])
+        # self.upsampling = self.upsampling(
+        #     target_size=target_size,
+        #     data_format=self.data_format
+        # )
 
-        super().build(input_shape=input_shape, input_shape_skip=input_shape_skip)
+
+        # super().build(input_shape=input_shape, input_shape_skip=input_shape_skip)
